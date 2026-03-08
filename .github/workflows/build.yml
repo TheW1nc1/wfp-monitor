@@ -79,7 +79,7 @@ jobs:
         Start-Process -FilePath "build\Release\WfpController.exe" -ArgumentList "`"$testExePath`"" -NoNewWindow -Wait
         
         echo "[*] Dumping output of result.txt"
-        Get-Content result.txt || echo "result.txt not found!"
+        if (Test-Path result.txt) { Get-Content result.txt } else { echo "result.txt not found!" }
         
     - name: Upload Genuine Output Data
       uses: actions/upload-artifact@v4
