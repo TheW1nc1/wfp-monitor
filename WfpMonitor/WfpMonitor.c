@@ -33,8 +33,8 @@ extern "C" DRIVER_INITIALIZE DriverEntry;
 extern "C" DRIVER_UNLOAD WfpMonitorUnload;
 NTSTATUS RegisterCallouts(DEVICE_OBJECT* deviceObject);
 void UnregisterCallouts();
-NTSTATUS WfpMonitorCreateClose(PDEVICE_OBJECT DeviceObject, PIRP Irp);
-NTSTATUS WfpMonitorDeviceControl(PDEVICE_OBJECT DeviceObject, PIRP Irp);
+extern "C" NTSTATUS WfpMonitorCreateClose(PDEVICE_OBJECT DeviceObject, PIRP Irp);
+extern "C" NTSTATUS WfpMonitorDeviceControl(PDEVICE_OBJECT DeviceObject, PIRP Irp);
 
 // Callout Functions
 void NTAPI AleFlowEstablishedClassify(
@@ -44,7 +44,7 @@ void NTAPI AleFlowEstablishedClassify(
     const void* classifyContext,
     const FWPS_FILTER0* filter,
     UINT64 flowContext,
-    FWPS_CLASSIFY_OUT0* classifyOut
+    void* classifyOut
 );
 NTSTATUS NTAPI AleFlowEstablishedNotify(FWPS_CALLOUT_NOTIFY_TYPE notifyType, const GUID* filterKey, FWPS_FILTER0* filter);
 
@@ -55,7 +55,7 @@ void NTAPI StreamClassify(
     const void* classifyContext,
     const FWPS_FILTER0* filter,
     UINT64 flowContext,
-    FWPS_CLASSIFY_OUT0* classifyOut
+    void* classifyOut
 );
 NTSTATUS NTAPI StreamNotify(FWPS_CALLOUT_NOTIFY_TYPE notifyType, const GUID* filterKey, FWPS_FILTER0* filter);
 void NTAPI StreamFlowDelete(UINT16 layerId, UINT32 calloutId, UINT64 flowContext);
@@ -149,7 +149,7 @@ void WfpMonitorUnload(PDRIVER_OBJECT DriverObject)
     }
 }
 
-NTSTATUS WfpMonitorCreateClose(PDEVICE_OBJECT DeviceObject, PIRP Irp)
+extern "C" NTSTATUS WfpMonitorCreateClose(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 {
     UNREFERENCED_PARAMETER(DeviceObject);
     Irp->IoStatus.Status = STATUS_SUCCESS;
@@ -158,7 +158,7 @@ NTSTATUS WfpMonitorCreateClose(PDEVICE_OBJECT DeviceObject, PIRP Irp)
     return STATUS_SUCCESS;
 }
 
-NTSTATUS WfpMonitorDeviceControl(PDEVICE_OBJECT DeviceObject, PIRP Irp)
+extern "C" NTSTATUS WfpMonitorDeviceControl(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 {
     UNREFERENCED_PARAMETER(DeviceObject);
     PIO_STACK_LOCATION irpSp = IoGetCurrentIrpStackLocation(Irp);
@@ -318,9 +318,10 @@ void NTAPI AleFlowEstablishedClassify(
     const void* classifyContext,
     const FWPS_FILTER0* filter,
     UINT64 flowContext,
-    FWPS_CLASSIFY_OUT0* classifyOut
+    void* classifyOutStruct
 )
 {
+    FWPS_CLASSIFY_OUT0* classifyOut = (FWPS_CLASSIFY_OUT0*)classifyOutStruct;
     UNREFERENCED_PARAMETER(layerData);
     UNREFERENCED_PARAMETER(classifyContext);
     UNREFERENCED_PARAMETER(filter);
@@ -383,9 +384,10 @@ void NTAPI StreamClassify(
     const void* classifyContext,
     const FWPS_FILTER0* filter,
     UINT64 flowContext,
-    FWPS_CLASSIFY_OUT0* classifyOut
+    void* classifyOutStruct
 )
 {
+    FWPS_CLASSIFY_OUT0* classifyOut = (FWPS_CLASSIFY_OUT0*)classifyOutStruct;
     UNREFERENCED_PARAMETER(inMetaValues);
     UNREFERENCED_PARAMETER(classifyContext);
     UNREFERENCED_PARAMETER(filter);
