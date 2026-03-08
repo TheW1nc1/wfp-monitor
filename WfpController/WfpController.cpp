@@ -120,7 +120,7 @@ int wmain(int argc, wchar_t* argv[]) {
     }
 
     HANDLE hDevice = CreateFileW(WFP_MONITOR_SYMLINK_USER, GENERIC_READ | GENERIC_WRITE,
-                                0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
+                                FILE_SHARE_READ | FILE_SHARE_WRITE, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (hDevice == INVALID_HANDLE_VALUE) {
         wcerr << L"Failed to open device: " << GetLastError() << endl;
         if (!skipMgmt) {
@@ -136,15 +136,16 @@ int wmain(int argc, wchar_t* argv[]) {
     if (!CreateProcessW(NULL, &exePath[0], NULL, NULL, FALSE, CREATE_SUSPENDED, NULL, NULL, &si, &pi)) {
         wcerr << L"Failed to start target process: " << GetLastError() << endl;
         CloseHandle(hDevice);
-        ManageDriver(L"WfpMonitor", driverPath, false);
+        if (!skipMgmt) {
+            ManageDriver(L"WfpMonitor", driverPath, false);
+        }
         return 1;
     }
 
     wcout << L"[*] Process started with PID: " << pi.dwProcessId << endl;
 
     // Send PID to driver
-    WFP_MONITOR_SET_PID_IN setPidIn;
-    setPidIn.ProcessId = pi.dwProcessId;
+    WFP_MONITOR_SET_PID_IN setPidIn = { pi.dwProcessId };
     DWORD bytesReturned = 0;
     if (!DeviceIoControl(hDevice, IOCTL_WFP_MONITOR_SET_PID, &setPidIn, sizeof(setPidIn), NULL, 0, &bytesReturned, NULL)) {
         wcerr << L"Failed to send PID to driver: " << GetLastError() << endl;
@@ -153,13 +154,11 @@ int wmain(int argc, wchar_t* argv[]) {
     }
 
     ResumeThread(pi.hThread);
-
-    // Wait for the process to exit
-    wcout << L"[*] Waiting for process to complete..." << endl;
+    wcout << L"[*] Waiting for process to terminate..." << endl;
     WaitForSingleObject(pi.hProcess, INFINITE);
     wcout << L"[*] Process exited." << endl;
 
-    // Retrieve stats
+    // Get Final Stats
     WFP_MONITOR_STATS_OUT statsOut = { 0 };
     if (!DeviceIoControl(hDevice, IOCTL_WFP_MONITOR_GET_STATS, NULL, 0, &statsOut, sizeof(statsOut), &bytesReturned, NULL)) {
         wcerr << L"Failed to get stats from driver: " << GetLastError() << endl;
@@ -177,26 +176,18 @@ int wmain(int argc, wchar_t* argv[]) {
     // Format results
     string resultStrDst = "ANY";
     if (statsOut.DestIp != 0) {
-        char ipStr[INET_ADDRSTRLEN];
-        // Convert from network byte order if necessary.
-        // IP_REMOTE_ADDRESS comes in host byte order usually from FWPS_FIELD.
-        // Let's assume it was taken in host byte order:
         struct in_addr addr;
-        addr.S_un.S_addr = htonl(statsOut.DestIp);
-        inet_ntop(AF_INET, &addr, ipStr, sizeof(ipStr));
-        
-        resultStrDst = string(ipStr) + ":" + to_string(statsOut.DestPort);
+        addr.s_addr = statsOut.DestIp;
+        resultStrDst = inet_ntoa(addr);
+        resultStrDst += ":" + to_string(ntohs(statsOut.DestPort));
     }
 
-    wcout << L"--------------------------------------" << endl;
-    wcout << L"DST=" << wstring(resultStrDst.begin(), resultStrDst.end()) << endl;
-    wcout << L"TX_BYTES=" << statsOut.TxBytes << endl;
-    wcout << L"RX_BYTES=" << statsOut.RxBytes << endl;
-    wcout << L"DEBUG ALE CALLS=" << statsOut.DebugCallAle << endl;
-    wcout << L"DEBUG PID MATCHES=" << statsOut.DebugMatchPid << endl;
-    wcout << L"DEBUG STREAM CALLS=" << statsOut.DebugCallStream << endl;
-    wcout << L"DEBUG CONTEXT MATCHES=" << statsOut.DebugMatchContext << endl;
-    wcout << L"--------------------------------------" << endl;
+    wcout << L"-----------------------------------" << endl;
+    wcout << L"Traffic Statistics for PID " << pi.dwProcessId << L":" << endl;
+    wcout << L"Destination: " << string_to_wstring(resultStrDst) << endl;
+    wcout << L"Sent: " << statsOut.TxBytes << L" bytes" << endl;
+    wcout << L"Received: " << statsOut.RxBytes << L" bytes" << endl;
+    wcout << L"-----------------------------------" << endl;
 
     // Write to result.txt (in current directory)
     ofstream outFile("result.txt");
@@ -205,11 +196,7 @@ int wmain(int argc, wchar_t* argv[]) {
         outFile << "TX_BYTES=" << statsOut.TxBytes << "\n";
         outFile << "RX_BYTES=" << statsOut.RxBytes << "\n";
         outFile << "DEBUG_ALE_CALLS=" << statsOut.DebugCallAle << "\n";
-        outFile << "DEBUG_NO_PID_METADATA=" << statsOut.DebugNoPidMetadata << "\n";
         outFile << "DEBUG_PID_MATCHES=" << statsOut.DebugMatchPid << "\n";
-        outFile << "DEBUG_ATTEMPT_ASSOC=" << statsOut.DebugAttempt << "\n";
-        outFile << "DEBUG_ASSOCIATE_FAILED=" << statsOut.DebugAssociateFailed << "\n";
-        outFile << "DEBUG_STREAM_CALLS=" << statsOut.DebugCallStream << "\n";
         outFile << "DEBUG_CONTEXT_MATCHES=" << statsOut.DebugMatchContext << "\n";
         outFile.close();
         wcout << L"[*] Results written to result.txt." << endl;

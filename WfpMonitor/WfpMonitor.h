@@ -2,7 +2,7 @@
 
 // Device name and symbolic link
 #define WFP_MONITOR_DEVICE_NAME     L"\\Device\\WfpMonitor"
-#define WFP_MONITOR_SYMLINK_KERNEL  L"\\DosDevices\\WfpMonitor"
+#define WFP_MONITOR_SYMLINK_KERNEL  L"\\??\\WfpMonitor"
 #define WFP_MONITOR_SYMLINK_USER    L"\\\\.\\WfpMonitor"
 
 // IOCTL Definitions
@@ -31,10 +31,6 @@ typedef struct _WFP_MONITOR_STATS_OUT {
     ULONG DestIp;     // IPv4 network byte order
     USHORT DestPort;  // Network byte order
     ULONG DebugCallAle;
-    ULONG DebugNoPidMetadata;
     ULONG DebugMatchPid;
-    ULONG DebugAttempt;
-    ULONG DebugAssociateFailed;
-    ULONG DebugCallStream;
     ULONG DebugMatchContext;
 } WFP_MONITOR_STATS_OUT, *PWFP_MONITOR_STATS_OUT;

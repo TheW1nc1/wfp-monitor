@@ -412,71 +412,41 @@ void AleFlowEstablishedClassify(
     UNREFERENCED_PARAMETER(flowContext);
 
     classifyOut->actionType = FWP_ACTION_PERMIT;
-    
+    if ((classifyOut->rights & FWPS_RIGHT_ACTION_WRITE) == 0) return;
+
     KIRQL oldIrql;
     KeAcquireSpinLock(&g_StatsLock, &oldIrql);
     g_Stats.DebugCallAle++;
     KeReleaseSpinLock(&g_StatsLock, oldIrql);
 
-    if ((classifyOut->rights & FWPS_RIGHT_ACTION_WRITE) == 0) return;
-
-    if (!(inMetaValues->currentMetadataValues & FWPS_METADATA_FIELD_PROCESS_ID)) {
-        KeAcquireSpinLock(&g_StatsLock, &oldIrql);
-        g_Stats.DebugNoPidMetadata++;
-        KeReleaseSpinLock(&g_StatsLock, oldIrql);
-        return;
-    }
-
-    if (!(inMetaValues->currentMetadataValues & FWPS_METADATA_FIELD_FLOW_HANDLE)) {
+    if (!(inMetaValues->currentMetadataValues & FWPS_METADATA_FIELD_PROCESS_ID) ||
+        !(inMetaValues->currentMetadataValues & FWPS_METADATA_FIELD_FLOW_HANDLE)) {
         return;
     }
 
     ULONG processId = (ULONG)inMetaValues->processId;
     ULONG targetPid;
-    
     KeAcquireSpinLock(&g_StatsLock, &oldIrql);
     targetPid = g_TargetPid;
     KeReleaseSpinLock(&g_StatsLock, oldIrql);
 
-    // If target PID matches, we monitor this flow
     if (targetPid > 0 && processId == targetPid) {
-        
         KeAcquireSpinLock(&g_StatsLock, &oldIrql);
         g_Stats.DebugMatchPid++;
         KeReleaseSpinLock(&g_StatsLock, oldIrql);
         
-        KeAcquireSpinLock(&g_StatsLock, &oldIrql);
-        g_Stats.DebugAttempt++;
-        KeReleaseSpinLock(&g_StatsLock, oldIrql);
-        
-        // Setup flow context according to IPv4 or IPv6
-        NTSTATUS status;
         if (inFixedValues->layerId == FWPS_LAYER_ALE_FLOW_ESTABLISHED_V4) {
-            status = FwpsFlowAssociateContext0(inMetaValues->flowHandle, FWPS_LAYER_STREAM_V4, g_CalloutIdStreamV4, g_FlowContextValue);
-            
-            if (NT_SUCCESS(status)) {
-                // Assume IPv4, record Destination IP and Port
-                if (inFixedValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V4_IP_REMOTE_ADDRESS].value.type == FWP_UINT32) {
-                    UINT32 destIp = inFixedValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V4_IP_REMOTE_ADDRESS].value.uint32;
-                    UINT16 destPort = inFixedValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V4_IP_REMOTE_PORT].value.uint16;
-                    
-                    KeAcquireSpinLock(&g_StatsLock, &oldIrql);
-                    g_Stats.DestIp = RtlUlongByteSwap(destIp);
-                    g_Stats.DestPort = RtlUshortByteSwap(destPort);
-                    KeReleaseSpinLock(&g_StatsLock, oldIrql);
-                }
-            } else {
+            FwpsFlowAssociateContext0(inMetaValues->flowHandle, FWPS_LAYER_STREAM_V4, g_CalloutIdStreamV4, g_FlowContextValue);
+            if (inFixedValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V4_IP_REMOTE_ADDRESS].value.type == FWP_UINT32) {
+                UINT32 destIp = inFixedValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V4_IP_REMOTE_ADDRESS].value.uint32;
+                UINT16 destPort = inFixedValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V4_IP_REMOTE_PORT].value.uint16;
                 KeAcquireSpinLock(&g_StatsLock, &oldIrql);
-                g_Stats.DebugAssociateFailed++;
+                g_Stats.DestIp = RtlUlongByteSwap(destIp);
+                g_Stats.DestPort = RtlUshortByteSwap(destPort);
                 KeReleaseSpinLock(&g_StatsLock, oldIrql);
             }
         } else if (inFixedValues->layerId == FWPS_LAYER_ALE_FLOW_ESTABLISHED_V6) {
-            status = FwpsFlowAssociateContext0(inMetaValues->flowHandle, FWPS_LAYER_STREAM_V6, g_CalloutIdStreamV6, g_FlowContextValue);
-            if (!NT_SUCCESS(status)) {
-                KeAcquireSpinLock(&g_StatsLock, &oldIrql);
-                g_Stats.DebugAssociateFailed++;
-                KeReleaseSpinLock(&g_StatsLock, oldIrql);
-            }
+            FwpsFlowAssociateContext0(inMetaValues->flowHandle, FWPS_LAYER_STREAM_V6, g_CalloutIdStreamV6, g_FlowContextValue);
         }
     }
 }
@@ -505,24 +475,18 @@ void StreamClassify(
     UNREFERENCED_PARAMETER(filter);
 
     classifyOut->actionType = FWP_ACTION_PERMIT;
-    
-    KIRQL oldIrql;
-    KeAcquireSpinLock(&g_StatsLock, &oldIrql);
-    g_Stats.DebugCallStream++;
-    KeReleaseSpinLock(&g_StatsLock, oldIrql);
-    
     if ((classifyOut->rights & FWPS_RIGHT_ACTION_WRITE) == 0) return;
 
     if (flowContext == g_FlowContextValue) {
+        KIRQL oldIrql;
         KeAcquireSpinLock(&g_StatsLock, &oldIrql);
         g_Stats.DebugMatchContext++;
         KeReleaseSpinLock(&g_StatsLock, oldIrql);
         
         FWPS_STREAM_CALLOUT_IO_PACKET0* streamPacket = (FWPS_STREAM_CALLOUT_IO_PACKET0*)layerData;
         if (streamPacket && streamPacket->streamData != NULL && streamPacket->streamData->dataLength > 0) {
-            
-            UINT32 direction = inFixedValues->incomingValue[FWPS_FIELD_STREAM_V4_DIRECTION].value.uint32;
-            
+            UINT32 directionField = (inFixedValues->layerId == FWPS_LAYER_STREAM_V4) ? FWPS_FIELD_STREAM_V4_DIRECTION : FWPS_FIELD_STREAM_V6_DIRECTION;
+            UINT32 direction = inFixedValues->incomingValue[directionField].value.uint32;
             KeAcquireSpinLock(&g_StatsLock, &oldIrql);
             if (direction == FWP_DIRECTION_OUTBOUND) {
                 g_Stats.TxBytes += streamPacket->streamData->dataLength;
