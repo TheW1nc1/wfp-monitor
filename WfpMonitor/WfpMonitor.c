@@ -3,7 +3,7 @@
 #pragma warning(disable:4201)       // unnamed struct/union
 
 #define NDIS_MINIPORT_DRIVER 1
-#define NDIS60 1                    // Target NDIS 6.0+ for Windows Vista and later
+#define NDIS60_MINIPORT 1           // Target NDIS 6.0+ for Windows Vista and later
 #include <ndis.h>           // Required for NDIS_HANDLE used in fwpsk.h
 #include <fwpsk.h>
 #pragma warning(pop)
