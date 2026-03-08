@@ -119,11 +119,13 @@ int wmain(int argc, wchar_t* argv[]) {
         wcout << L"[*] Skipping driver management as requested." << endl;
     }
 
-    HANDLE hDevice = CreateFileW(WFP_MONITOR_SYMLINK_NAME, GENERIC_READ | GENERIC_WRITE,
+    HANDLE hDevice = CreateFileW(WFP_MONITOR_SYMLINK_USER, GENERIC_READ | GENERIC_WRITE,
                                 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL);
     if (hDevice == INVALID_HANDLE_VALUE) {
         wcerr << L"Failed to open device: " << GetLastError() << endl;
-        ManageDriver(L"WfpMonitor", driverPath, false);
+        if (!skipMgmt) {
+            ManageDriver(L"WfpMonitor", driverPath, false);
+        }
         return 1;
     }
 
@@ -203,7 +205,10 @@ int wmain(int argc, wchar_t* argv[]) {
         outFile << "TX_BYTES=" << statsOut.TxBytes << "\n";
         outFile << "RX_BYTES=" << statsOut.RxBytes << "\n";
         outFile << "DEBUG_ALE_CALLS=" << statsOut.DebugCallAle << "\n";
+        outFile << "DEBUG_NO_PID_METADATA=" << statsOut.DebugNoPidMetadata << "\n";
         outFile << "DEBUG_PID_MATCHES=" << statsOut.DebugMatchPid << "\n";
+        outFile << "DEBUG_ATTEMPT_ASSOC=" << statsOut.DebugAttempt << "\n";
+        outFile << "DEBUG_ASSOCIATE_FAILED=" << statsOut.DebugAssociateFailed << "\n";
         outFile << "DEBUG_STREAM_CALLS=" << statsOut.DebugCallStream << "\n";
         outFile << "DEBUG_CONTEXT_MATCHES=" << statsOut.DebugMatchContext << "\n";
         outFile.close();

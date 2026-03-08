@@ -85,7 +85,7 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING RegistryPath)
     UNREFERENCED_PARAMETER(RegistryPath);
 
     RtlInitUnicodeString(&deviceName, WFP_MONITOR_DEVICE_NAME);
-    RtlInitUnicodeString(&symLinkName, WFP_MONITOR_SYMLINK_NAME);
+    RtlInitUnicodeString(&symLinkName, WFP_MONITOR_SYMLINK_KERNEL);
 
     // Create Device
     status = IoCreateDevice(
@@ -147,7 +147,7 @@ void WfpMonitorUnload(PDRIVER_OBJECT DriverObject)
         g_EngineHandle = NULL;
     }
 
-    RtlInitUnicodeString(&symLinkName, WFP_MONITOR_SYMLINK_NAME);
+    RtlInitUnicodeString(&symLinkName, WFP_MONITOR_SYMLINK_KERNEL);
     IoDeleteSymbolicLink(&symLinkName);
 
     if (g_DeviceObject != NULL) {
@@ -443,6 +443,10 @@ void AleFlowEstablishedClassify(
         
         KeAcquireSpinLock(&g_StatsLock, &oldIrql);
         g_Stats.DebugMatchPid++;
+        KeReleaseSpinLock(&g_StatsLock, oldIrql);
+        
+        KeAcquireSpinLock(&g_StatsLock, &oldIrql);
+        g_Stats.DebugAttempt++;
         KeReleaseSpinLock(&g_StatsLock, oldIrql);
         
         // Setup flow context according to IPv4 or IPv6
