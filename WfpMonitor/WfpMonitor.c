@@ -1,6 +1,9 @@
 #include <ntddk.h>
 #pragma warning(push)
 #pragma warning(disable:4201)       // unnamed struct/union
+
+#define NDIS_MINIPORT_DRIVER 1
+#define NDIS60 1                    // Target NDIS 6.0+ for Windows Vista and later
 #include <ndis.h>           // Required for NDIS_HANDLE used in fwpsk.h
 #include <fwpsk.h>
 #pragma warning(pop)
@@ -29,36 +32,36 @@ UINT64 g_FlowContextValue = 0xDEADBEEFCAFE;
 //
 // Function Prototypes
 //
-extern "C" DRIVER_INITIALIZE DriverEntry;
-extern "C" DRIVER_UNLOAD WfpMonitorUnload;
+DRIVER_INITIALIZE DriverEntry;
+DRIVER_UNLOAD WfpMonitorUnload;
 NTSTATUS RegisterCallouts(DEVICE_OBJECT* deviceObject);
 void UnregisterCallouts();
-extern "C" NTSTATUS WfpMonitorCreateClose(PDEVICE_OBJECT DeviceObject, PIRP Irp);
-extern "C" NTSTATUS WfpMonitorDeviceControl(PDEVICE_OBJECT DeviceObject, PIRP Irp);
+NTSTATUS WfpMonitorCreateClose(PDEVICE_OBJECT DeviceObject, PIRP Irp);
+NTSTATUS WfpMonitorDeviceControl(PDEVICE_OBJECT DeviceObject, PIRP Irp);
 
 // Callout Functions
-void NTAPI AleFlowEstablishedClassify(
+void AleFlowEstablishedClassify(
     const FWPS_INCOMING_VALUES0* inFixedValues,
     const FWPS_INCOMING_METADATA_VALUES0* inMetaValues,
     void* layerData,
     const void* classifyContext,
     const FWPS_FILTER0* filter,
     UINT64 flowContext,
-    void* classifyOut
+    FWPS_CLASSIFY_OUT0* classifyOut
 );
-NTSTATUS NTAPI AleFlowEstablishedNotify(FWPS_CALLOUT_NOTIFY_TYPE notifyType, const GUID* filterKey, FWPS_FILTER0* filter);
+NTSTATUS AleFlowEstablishedNotify(FWPS_CALLOUT_NOTIFY_TYPE notifyType, const GUID* filterKey, FWPS_FILTER0* filter);
 
-void NTAPI StreamClassify(
+void StreamClassify(
     const FWPS_INCOMING_VALUES0* inFixedValues,
     const FWPS_INCOMING_METADATA_VALUES0* inMetaValues,
     void* layerData,
     const void* classifyContext,
     const FWPS_FILTER0* filter,
     UINT64 flowContext,
-    void* classifyOut
+    FWPS_CLASSIFY_OUT0* classifyOut
 );
-NTSTATUS NTAPI StreamNotify(FWPS_CALLOUT_NOTIFY_TYPE notifyType, const GUID* filterKey, FWPS_FILTER0* filter);
-void NTAPI StreamFlowDelete(UINT16 layerId, UINT32 calloutId, UINT64 flowContext);
+NTSTATUS StreamNotify(FWPS_CALLOUT_NOTIFY_TYPE notifyType, const GUID* filterKey, FWPS_FILTER0* filter);
+void StreamFlowDelete(UINT16 layerId, UINT32 calloutId, UINT64 flowContext);
 
 // Device Control Definitions
 #ifdef ALLOC_PRAGMA
@@ -149,7 +152,7 @@ void WfpMonitorUnload(PDRIVER_OBJECT DriverObject)
     }
 }
 
-extern "C" NTSTATUS WfpMonitorCreateClose(PDEVICE_OBJECT DeviceObject, PIRP Irp)
+NTSTATUS WfpMonitorCreateClose(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 {
     UNREFERENCED_PARAMETER(DeviceObject);
     Irp->IoStatus.Status = STATUS_SUCCESS;
@@ -158,7 +161,7 @@ extern "C" NTSTATUS WfpMonitorCreateClose(PDEVICE_OBJECT DeviceObject, PIRP Irp)
     return STATUS_SUCCESS;
 }
 
-extern "C" NTSTATUS WfpMonitorDeviceControl(PDEVICE_OBJECT DeviceObject, PIRP Irp)
+NTSTATUS WfpMonitorDeviceControl(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 {
     UNREFERENCED_PARAMETER(DeviceObject);
     PIO_STACK_LOCATION irpSp = IoGetCurrentIrpStackLocation(Irp);
@@ -311,17 +314,16 @@ void UnregisterCallouts()
 }
 
 // ALE Flow Established
-void NTAPI AleFlowEstablishedClassify(
+void AleFlowEstablishedClassify(
     const FWPS_INCOMING_VALUES0* inFixedValues,
     const FWPS_INCOMING_METADATA_VALUES0* inMetaValues,
     void* layerData,
     const void* classifyContext,
     const FWPS_FILTER0* filter,
     UINT64 flowContext,
-    void* classifyOutStruct
+    FWPS_CLASSIFY_OUT0* classifyOut
 )
 {
-    FWPS_CLASSIFY_OUT0* classifyOut = (FWPS_CLASSIFY_OUT0*)classifyOutStruct;
     UNREFERENCED_PARAMETER(layerData);
     UNREFERENCED_PARAMETER(classifyContext);
     UNREFERENCED_PARAMETER(filter);
@@ -368,7 +370,7 @@ void NTAPI AleFlowEstablishedClassify(
     }
 }
 
-NTSTATUS NTAPI AleFlowEstablishedNotify(FWPS_CALLOUT_NOTIFY_TYPE notifyType, const GUID* filterKey, FWPS_FILTER0* filter)
+NTSTATUS AleFlowEstablishedNotify(FWPS_CALLOUT_NOTIFY_TYPE notifyType, const GUID* filterKey, FWPS_FILTER0* filter)
 {
     UNREFERENCED_PARAMETER(notifyType);
     UNREFERENCED_PARAMETER(filterKey);
@@ -377,17 +379,16 @@ NTSTATUS NTAPI AleFlowEstablishedNotify(FWPS_CALLOUT_NOTIFY_TYPE notifyType, con
 }
 
 // Stream callout
-void NTAPI StreamClassify(
+void StreamClassify(
     const FWPS_INCOMING_VALUES0* inFixedValues,
     const FWPS_INCOMING_METADATA_VALUES0* inMetaValues,
     void* layerData,
     const void* classifyContext,
     const FWPS_FILTER0* filter,
     UINT64 flowContext,
-    void* classifyOutStruct
+    FWPS_CLASSIFY_OUT0* classifyOut
 )
 {
-    FWPS_CLASSIFY_OUT0* classifyOut = (FWPS_CLASSIFY_OUT0*)classifyOutStruct;
     UNREFERENCED_PARAMETER(inMetaValues);
     UNREFERENCED_PARAMETER(classifyContext);
     UNREFERENCED_PARAMETER(filter);
@@ -413,7 +414,7 @@ void NTAPI StreamClassify(
     }
 }
 
-NTSTATUS NTAPI StreamNotify(FWPS_CALLOUT_NOTIFY_TYPE notifyType, const GUID* filterKey, FWPS_FILTER0* filter)
+NTSTATUS StreamNotify(FWPS_CALLOUT_NOTIFY_TYPE notifyType, const GUID* filterKey, FWPS_FILTER0* filter)
 {
     UNREFERENCED_PARAMETER(notifyType);
     UNREFERENCED_PARAMETER(filterKey);
@@ -421,7 +422,7 @@ NTSTATUS NTAPI StreamNotify(FWPS_CALLOUT_NOTIFY_TYPE notifyType, const GUID* fil
     return STATUS_SUCCESS;
 }
 
-void NTAPI StreamFlowDelete(UINT16 layerId, UINT32 calloutId, UINT64 flowContext)
+void StreamFlowDelete(UINT16 layerId, UINT32 calloutId, UINT64 flowContext)
 {
     UNREFERENCED_PARAMETER(layerId);
     UNREFERENCED_PARAMETER(calloutId);

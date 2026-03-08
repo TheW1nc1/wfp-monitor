@@ -15,7 +15,5 @@ message(STATUS "Using WDK version: ${WDK_VERSION}")
 
 wdk_add_driver(WfpMonitor WfpMonitor/WfpMonitor.c)
 
-set_source_files_properties(WfpMonitor/WfpMonitor.c PROPERTIES LANGUAGE CXX)
-
 # Link WFP kernel library using FindWDK's generated IMPORTED target (plain style)
 target_link_libraries(WfpMonitor WDK::FWPKCLNT)
