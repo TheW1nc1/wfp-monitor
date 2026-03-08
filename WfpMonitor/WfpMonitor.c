@@ -22,6 +22,8 @@ UINT32 g_CalloutIdAleFlowV6 = 0;
 UINT32 g_CalloutIdStreamV6 = 0;
 UINT64 g_FilterIdAleFlowV4 = 0;
 UINT64 g_FilterIdStreamV4 = 0;
+UINT64 g_FilterIdAleFlowV6 = 0;
+UINT64 g_FilterIdStreamV6 = 0;
 
 ULONG g_TargetPid = 0;
 WFP_MONITOR_STATS_OUT g_Stats = { 0 };
