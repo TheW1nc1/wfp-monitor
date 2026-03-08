@@ -18,20 +18,21 @@ jobs:
     - name: Setup MSVC
       uses: ilammy/msvc-dev-cmd@v1
 
-    - name: Install WDK 10.0.22621 via winget
+    - name: Discover Installed WDK Versions
       shell: powershell
       run: |
-        Write-Host "Installing WDK 10.0.22621.0 via winget..."
-        # WDK 22621 package ID from winget
-        winget install --id Microsoft.WindowsDriverKit.10.0.22621 `
-          --silent --accept-package-agreements --accept-source-agreements
-        Write-Host "WDK install exit code: $LASTEXITCODE"
-        # Verify installation
-        $wdkPath = "C:\Program Files (x86)\Windows Kits\10\Include\10.0.22621.0\km\ntddk.h"
-        if (Test-Path $wdkPath) {
-          Write-Host "WDK 22621 verified at: $wdkPath"
+        Write-Host "=== Checking installed WDK versions ==="
+        $wdkBase = "C:\Program Files (x86)\Windows Kits\10\Include"
+        if (Test-Path $wdkBase) {
+          Get-ChildItem -Path $wdkBase -Directory | ForEach-Object {
+            $ver = $_.Name
+            $ntddk = Join-Path $_.FullName "km\ntddk.h"
+            if (Test-Path $ntddk) {
+              Write-Host "  Found WDK: $ver"
+            }
+          }
         } else {
-          Write-Error "WDK 22621 NOT found! Build will likely fail."
+          Write-Host "  No WDK found at $wdkBase"
         }
 
     - name: Configure CMake

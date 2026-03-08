@@ -9,21 +9,24 @@ add_executable(WfpController WfpController/WfpController.cpp)
 target_link_libraries(WfpController PRIVATE Ws2_32)
 
 # --- 2. Kernel Mode Driver ---
-# Force WDK 22621 to avoid fwpsk.h IF_INDEX redefinition bug in WDK 26100.
-# FindWDK by default picks the LATEST installed WDK version (26100 > 22621).
-# By setting WDK_LATEST_NTDDK_FILE explicitly, we pin to 22621.
-set(WDK_22621_PATH "C:/Program Files (x86)/Windows Kits/10/Include/10.0.22621.0/km/ntddk.h")
-if(EXISTS "${WDK_22621_PATH}")
-    message(STATUS "Forcing WDK 22621 to avoid fwpsk.h IF_INDEX conflict in 26100")
-    set(WDK_LATEST_NTDDK_FILE "${WDK_22621_PATH}" CACHE FILEPATH "" FORCE)
-else()
-    message(WARNING "WDK 22621 not found at expected path, FindWDK will use latest (may cause IF_INDEX conflict)")
-endif()
+# WDK version selection strategy:
+# FindWDK picks the LATEST installed WDK by default, but WDK 26100 has a known
+# IF_INDEX redefinition bug in fwpsk.h. We prefer older stable versions.
+# Try 22621 first, then 22000, then fall back to whatever FindWDK discovers.
+foreach(_wdk_ver 10.0.22621.0 10.0.22000.0 10.0.19041.0)
+    set(_wdk_probe "C:/Program Files (x86)/Windows Kits/10/Include/${_wdk_ver}/km/ntddk.h")
+    if(EXISTS "${_wdk_probe}" AND NOT DEFINED WDK_LATEST_NTDDK_FILE_FORCED)
+        message(STATUS "Forcing WDK ${_wdk_ver} (avoids fwpsk.h IF_INDEX bug in 26100)")
+        set(WDK_LATEST_NTDDK_FILE "${_wdk_probe}" CACHE FILEPATH "" FORCE)
+        set(WDK_LATEST_NTDDK_FILE_FORCED TRUE CACHE BOOL "" FORCE)
+    endif()
+endforeach()
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/FindWDK/cmake")
 find_package(WDK REQUIRED)
+message(STATUS "Using WDK version: ${WDK_VERSION}")
 
 wdk_add_driver(WfpMonitor WfpMonitor/WfpMonitor.c)
 
-# Link WFP kernel library using FindWDK's IMPORTED target (plain style, not PRIVATE keyword)
+# Link WFP kernel library using FindWDK's generated IMPORTED target (plain style)
 target_link_libraries(WfpMonitor WDK::FWPKCLNT)
