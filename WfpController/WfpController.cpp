@@ -184,7 +184,7 @@ int wmain(int argc, wchar_t* argv[]) {
 
     wcout << L"-----------------------------------" << endl;
     wcout << L"Traffic Statistics for PID " << pi.dwProcessId << L":" << endl;
-    wcout << L"Destination: " << string_to_wstring(resultStrDst) << endl;
+    wcout << L"Destination: " << wstring(resultStrDst.begin(), resultStrDst.end()) << endl;
     wcout << L"Sent: " << statsOut.TxBytes << L" bytes" << endl;
     wcout << L"Received: " << statsOut.RxBytes << L" bytes" << endl;
     wcout << L"-----------------------------------" << endl;
