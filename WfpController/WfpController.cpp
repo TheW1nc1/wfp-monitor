@@ -186,6 +186,10 @@ int wmain(int argc, wchar_t* argv[]) {
         outFile << "DST=" << resultStrDst << "\n";
         outFile << "TX_BYTES=" << statsOut.TxBytes << "\n";
         outFile << "RX_BYTES=" << statsOut.RxBytes << "\n";
+        outFile << "DEBUG_ALE_CALLS=" << statsOut.DebugCallAle << "\n";
+        outFile << "DEBUG_PID_MATCHES=" << statsOut.DebugMatchPid << "\n";
+        outFile << "DEBUG_STREAM_CALLS=" << statsOut.DebugCallStream << "\n";
+        outFile << "DEBUG_CONTEXT_MATCHES=" << statsOut.DebugMatchContext << "\n";
         outFile.close();
         wcout << L"[*] Results written to result.txt." << endl;
     } else {

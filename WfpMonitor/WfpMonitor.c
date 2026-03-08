@@ -420,13 +420,18 @@ void AleFlowEstablishedClassify(
 
     if ((classifyOut->rights & FWPS_RIGHT_ACTION_WRITE) == 0) return;
 
-    if (!(inMetaValues->currentMetadataValues & FWPS_METADATA_FIELD_PROCESS_ID) ||
-        !(inMetaValues->currentMetadataValues & FWPS_METADATA_FIELD_FLOW_HANDLE)) {
+    if (!(inMetaValues->currentMetadataValues & FWPS_METADATA_FIELD_PROCESS_ID)) {
+        KeAcquireSpinLock(&g_StatsLock, &oldIrql);
+        g_Stats.DebugNoPidMetadata++;
+        KeReleaseSpinLock(&g_StatsLock, oldIrql);
+        return;
+    }
+
+    if (!(inMetaValues->currentMetadataValues & FWPS_METADATA_FIELD_FLOW_HANDLE)) {
         return;
     }
 
     ULONG processId = (ULONG)inMetaValues->processId;
-    
     ULONG targetPid;
     
     KeAcquireSpinLock(&g_StatsLock, &oldIrql);
@@ -456,10 +461,18 @@ void AleFlowEstablishedClassify(
                     g_Stats.DestPort = RtlUshortByteSwap(destPort);
                     KeReleaseSpinLock(&g_StatsLock, oldIrql);
                 }
+            } else {
+                KeAcquireSpinLock(&g_StatsLock, &oldIrql);
+                g_Stats.DebugAssociateFailed++;
+                KeReleaseSpinLock(&g_StatsLock, oldIrql);
             }
         } else if (inFixedValues->layerId == FWPS_LAYER_ALE_FLOW_ESTABLISHED_V6) {
             status = FwpsFlowAssociateContext0(inMetaValues->flowHandle, FWPS_LAYER_STREAM_V6, g_CalloutIdStreamV6, g_FlowContextValue);
-            // We ignore setting DestIp for IPv6 to keep it simple, controller will output "ANY" if DestIp == 0
+            if (!NT_SUCCESS(status)) {
+                KeAcquireSpinLock(&g_StatsLock, &oldIrql);
+                g_Stats.DebugAssociateFailed++;
+                KeReleaseSpinLock(&g_StatsLock, oldIrql);
+            }
         }
     }
 }
