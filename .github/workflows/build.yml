@@ -60,6 +60,33 @@ jobs:
       shell: cmd
       run: cmake --build build --config Release
 
+    - name: Generate Genuine Result (Test Sign & Run)
+      shell: powershell
+      run: |
+        echo "[*] Creating Self-Signed Code Signing Certificate"
+        $cert = New-SelfSignedCertificate -Subject "CN=WFPTestCI" -Type CodeSigningCert -CertStoreLocation Cert:\LocalMachine\My
+        $pwd = ConvertTo-SecureString -String "test" -Force -AsPlainText
+        Export-PfxCertificate -Cert $cert -FilePath cert.pfx -Password $pwd
+        
+        echo "[*] Trusting the new Root Certificate"
+        Import-PfxCertificate -FilePath cert.pfx -CertStoreLocation Cert:\LocalMachine\Root -Password $pwd
+        
+        echo "[*] Signing the WFP Kernel Driver"
+        & "C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\signtool.exe" sign /fd SHA256 /a /f cert.pfx /p "test" build\Release\WfpMonitor.sys
+        
+        echo "[*] Running Controller and Test Target"
+        $testExePath = Resolve-Path "test.exe" | Select-Object -ExpandProperty Path
+        Start-Process -FilePath "build\Release\WfpController.exe" -ArgumentList "`"$testExePath`"" -NoNewWindow -Wait
+        
+        echo "[*] Dumping output of result.txt"
+        Get-Content result.txt || echo "result.txt not found!"
+        
+    - name: Upload Genuine Output Data
+      uses: actions/upload-artifact@v4
+      with:
+        name: Real-Result-TXT
+        path: result.txt
+
     - name: Upload Binaries
       uses: actions/upload-artifact@v4
       with:
