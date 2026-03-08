@@ -18,6 +18,8 @@ PDEVICE_OBJECT g_DeviceObject = NULL;
 HANDLE g_EngineHandle = NULL;
 UINT32 g_CalloutIdAleFlowV4 = 0;
 UINT32 g_CalloutIdStreamV4 = 0;
+UINT32 g_CalloutIdAleFlowV6 = 0;
+UINT32 g_CalloutIdStreamV6 = 0;
 UINT64 g_FilterIdAleFlowV4 = 0;
 UINT64 g_FilterIdStreamV4 = 0;
 
@@ -222,16 +224,24 @@ NTSTATUS WfpMonitorDeviceControl(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 
 // GUIDs
 #include <initguid.h>
-// {A55F5A11-E623-45C1-A528-56BCA6FD8B2A}
-DEFINE_GUID(WFP_MONITOR_CALLOUT_ALE_FLOW_V4, 0xa55f5a11, 0xe623, 0x45c1, 0xa5, 0x28, 0x56, 0xbc, 0xa6, 0xfd, 0x8b, 0x2a);
-// {B66F6B22-E623-45C1-A528-56BCA6FD8B2B}
-DEFINE_GUID(WFP_MONITOR_CALLOUT_STREAM_V4, 0xb66f6b22, 0xe623, 0x45c1, 0xa5, 0x28, 0x56, 0xbc, 0xa6, 0xfd, 0x8b, 0x2b);
+// {11111111-2222-3333-4444-555555555555}
+DEFINE_GUID(WFP_MONITOR_CALLOUT_ALE_FLOW_V4,
+    0x11111111, 0x2222, 0x3333, 0x44, 0x44, 0x55, 0x55, 0x55, 0x55, 0x55, 0x55);
+// {66666666-7777-8888-9999-000000000000}
+DEFINE_GUID(WFP_MONITOR_CALLOUT_STREAM_V4,
+    0x66666666, 0x7777, 0x8888, 0x99, 0x99, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00);
+// {A1A1A1A1-B2B2-C3C3-D4D4-E5E5E5E5E5E5}
+DEFINE_GUID(WFP_MONITOR_CALLOUT_ALE_FLOW_V6,
+    0xa1a1a1a1, 0xb2b2, 0xc3c3, 0xd4, 0xd4, 0xe5, 0xe5, 0xe5, 0xe5, 0xe5, 0xe5);
+// {F6F6F6F6-A7A7-B8B8-C9C9-D0D0D0D0D0D0}
+DEFINE_GUID(WFP_MONITOR_CALLOUT_STREAM_V6,
+    0xf6f6f6f6, 0xa7a7, 0xb8b8, 0xc9, 0xc9, 0xd0, 0xd0, 0xd0, 0xd0, 0xd0, 0xd0);
 
 NTSTATUS RegisterCallouts(DEVICE_OBJECT* deviceObject)
 {
     NTSTATUS status;
 
-    // 1. ALE Flow Established Callout structure
+    // 1. ALE Flow Established Callout structure V4
     FWPS_CALLOUT0 calloutAle = { 0 };
     calloutAle.calloutKey = WFP_MONITOR_CALLOUT_ALE_FLOW_V4;
     calloutAle.classifyFn = (FWPS_CALLOUT_CLASSIFY_FN0)AleFlowEstablishedClassify;
@@ -241,14 +251,31 @@ NTSTATUS RegisterCallouts(DEVICE_OBJECT* deviceObject)
     status = FwpsCalloutRegister0(deviceObject, &calloutAle, &g_CalloutIdAleFlowV4);
     if (!NT_SUCCESS(status)) return status;
 
-    // Stream Callout structure
+    // Stream callout V4
     FWPS_CALLOUT0 calloutStream = { 0 };
     calloutStream.calloutKey = WFP_MONITOR_CALLOUT_STREAM_V4;
     calloutStream.classifyFn = (FWPS_CALLOUT_CLASSIFY_FN0)StreamClassify;
     calloutStream.notifyFn = (FWPS_CALLOUT_NOTIFY_FN0)StreamNotify;
     calloutStream.flowDeleteFn = (FWPS_CALLOUT_FLOW_DELETE_NOTIFY_FN0)StreamFlowDelete;
-
     status = FwpsCalloutRegister0(deviceObject, &calloutStream, &g_CalloutIdStreamV4);
+    if (!NT_SUCCESS(status)) return status;
+
+    // ALE Flow Established callout V6
+    FWPS_CALLOUT0 calloutAleV6 = { 0 };
+    calloutAleV6.calloutKey = WFP_MONITOR_CALLOUT_ALE_FLOW_V6;
+    calloutAleV6.classifyFn = (FWPS_CALLOUT_CLASSIFY_FN0)AleFlowEstablishedClassify;
+    calloutAleV6.notifyFn = (FWPS_CALLOUT_NOTIFY_FN0)AleFlowEstablishedNotify;
+    calloutAleV6.flowDeleteFn = NULL;
+    status = FwpsCalloutRegister0(deviceObject, &calloutAleV6, &g_CalloutIdAleFlowV6);
+    if (!NT_SUCCESS(status)) return status;
+
+    // Stream callout V6
+    FWPS_CALLOUT0 calloutStreamV6 = { 0 };
+    calloutStreamV6.calloutKey = WFP_MONITOR_CALLOUT_STREAM_V6;
+    calloutStreamV6.classifyFn = (FWPS_CALLOUT_CLASSIFY_FN0)StreamClassify;
+    calloutStreamV6.notifyFn = (FWPS_CALLOUT_NOTIFY_FN0)StreamNotify;
+    calloutStreamV6.flowDeleteFn = (FWPS_CALLOUT_FLOW_DELETE_NOTIFY_FN0)StreamFlowDelete;
+    status = FwpsCalloutRegister0(deviceObject, &calloutStreamV6, &g_CalloutIdStreamV6);
     if (!NT_SUCCESS(status)) return status;
 
     // Add Callouts to WFP Base Filtering Engine
@@ -264,6 +291,20 @@ NTSTATUS RegisterCallouts(DEVICE_OBJECT* deviceObject)
     mCalloutStream.displayData.name = L"Wfp Monitor Stream Callout";
     mCalloutStream.applicableLayer = FWPM_LAYER_STREAM_V4;
     status = FwpmCalloutAdd0(g_EngineHandle, &mCalloutStream, NULL, NULL);
+    if (!NT_SUCCESS(status)) return status;
+
+    FWPM_CALLOUT0 mCalloutAleV6 = { 0 };
+    mCalloutAleV6.calloutKey = WFP_MONITOR_CALLOUT_ALE_FLOW_V6;
+    mCalloutAleV6.displayData.name = L"Wfp Monitor ALE Flow Callout V6";
+    mCalloutAleV6.applicableLayer = FWPM_LAYER_ALE_FLOW_ESTABLISHED_V6;
+    status = FwpmCalloutAdd0(g_EngineHandle, &mCalloutAleV6, NULL, NULL);
+    if (!NT_SUCCESS(status)) return status;
+
+    FWPM_CALLOUT0 mCalloutStreamV6 = { 0 };
+    mCalloutStreamV6.calloutKey = WFP_MONITOR_CALLOUT_STREAM_V6;
+    mCalloutStreamV6.displayData.name = L"Wfp Monitor Stream Callout V6";
+    mCalloutStreamV6.applicableLayer = FWPM_LAYER_STREAM_V6;
+    status = FwpmCalloutAdd0(g_EngineHandle, &mCalloutStreamV6, NULL, NULL);
     if (!NT_SUCCESS(status)) return status;
 
     // Add Filters
@@ -285,6 +326,26 @@ NTSTATUS RegisterCallouts(DEVICE_OBJECT* deviceObject)
     filterStream.action.calloutKey = WFP_MONITOR_CALLOUT_STREAM_V4;
     filterStream.weight.type = FWP_EMPTY;
     status = FwpmFilterAdd0(g_EngineHandle, &filterStream, NULL, &g_FilterIdStreamV4);
+    if (!NT_SUCCESS(status)) return status;
+
+    FWPM_FILTER0 filterAleV6 = { 0 };
+    filterAleV6.filterKey = WFP_MONITOR_CALLOUT_ALE_FLOW_V6;
+    filterAleV6.displayData.name = L"Wfp Monitor ALE Flow Filter V6";
+    filterAleV6.layerKey = FWPM_LAYER_ALE_FLOW_ESTABLISHED_V6;
+    filterAleV6.action.type = FWP_ACTION_CALLOUT_TERMINATING;
+    filterAleV6.action.calloutKey = WFP_MONITOR_CALLOUT_ALE_FLOW_V6;
+    filterAleV6.weight.type = FWP_EMPTY;
+    status = FwpmFilterAdd0(g_EngineHandle, &filterAleV6, NULL, &g_FilterIdAleFlowV6);
+    if (!NT_SUCCESS(status)) return status;
+
+    FWPM_FILTER0 filterStreamV6 = { 0 };
+    filterStreamV6.filterKey = WFP_MONITOR_CALLOUT_STREAM_V6;
+    filterStreamV6.displayData.name = L"Wfp Monitor Stream Filter V6";
+    filterStreamV6.layerKey = FWPM_LAYER_STREAM_V6;
+    filterStreamV6.action.type = FWP_ACTION_CALLOUT_TERMINATING;
+    filterStreamV6.action.calloutKey = WFP_MONITOR_CALLOUT_STREAM_V6;
+    filterStreamV6.weight.type = FWP_EMPTY;
+    status = FwpmFilterAdd0(g_EngineHandle, &filterStreamV6, NULL, &g_FilterIdStreamV6);
 
     return status;
 }
@@ -300,8 +361,18 @@ void UnregisterCallouts()
             FwpmFilterDeleteById0(g_EngineHandle, g_FilterIdStreamV4);
             g_FilterIdStreamV4 = 0;
         }
+        if (g_FilterIdAleFlowV6 != 0) {
+            FwpmFilterDeleteById0(g_EngineHandle, g_FilterIdAleFlowV6);
+            g_FilterIdAleFlowV6 = 0;
+        }
+        if (g_FilterIdStreamV6 != 0) {
+            FwpmFilterDeleteById0(g_EngineHandle, g_FilterIdStreamV6);
+            g_FilterIdStreamV6 = 0;
+        }
         FwpmCalloutDeleteById0(g_EngineHandle, g_CalloutIdAleFlowV4);
         FwpmCalloutDeleteById0(g_EngineHandle, g_CalloutIdStreamV4);
+        FwpmCalloutDeleteById0(g_EngineHandle, g_CalloutIdAleFlowV6);
+        FwpmCalloutDeleteById0(g_EngineHandle, g_CalloutIdStreamV6);
     }
 
     if (g_CalloutIdAleFlowV4 != 0) {
@@ -311,6 +382,14 @@ void UnregisterCallouts()
     if (g_CalloutIdStreamV4 != 0) {
         FwpsCalloutUnregisterById0(g_CalloutIdStreamV4);
         g_CalloutIdStreamV4 = 0;
+    }
+    if (g_CalloutIdAleFlowV6 != 0) {
+        FwpsCalloutUnregisterById0(g_CalloutIdAleFlowV6);
+        g_CalloutIdAleFlowV6 = 0;
+    }
+    if (g_CalloutIdStreamV6 != 0) {
+        FwpsCalloutUnregisterById0(g_CalloutIdStreamV6);
+        g_CalloutIdStreamV6 = 0;
     }
 }
 
@@ -351,22 +430,26 @@ void AleFlowEstablishedClassify(
     // If target PID matches, we monitor this flow
     if (targetPid > 0 && processId == targetPid) {
         
-        // Setup flow context
-        NTSTATUS status = FwpsFlowAssociateContext0(inMetaValues->flowHandle, FWPS_LAYER_STREAM_V4, g_CalloutIdStreamV4, g_FlowContextValue);
-        
-        if (NT_SUCCESS(status)) {
-            // Assume IPv4, record Destination IP and Port
-            if (inFixedValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V4_IP_REMOTE_ADDRESS].value.type == FWP_UINT32) {
-                UINT32 destIp = inFixedValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V4_IP_REMOTE_ADDRESS].value.uint32;
-                UINT16 destPort = inFixedValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V4_IP_REMOTE_PORT].value.uint16;
-
-                KeAcquireSpinLock(&g_StatsLock, &oldIrql);
-                // Record the first destination encountered.
-                // Or if we want to overwrite, we can just do:
-                g_Stats.DestIp = destIp;     // host byte order -> need to use RtlUlongByteSwap later or just keep as is
-                g_Stats.DestPort = destPort; // host byte order
-                KeReleaseSpinLock(&g_StatsLock, oldIrql);
+        // Setup flow context according to IPv4 or IPv6
+        NTSTATUS status;
+        if (inFixedValues->layerId == FWPS_LAYER_ALE_FLOW_ESTABLISHED_V4) {
+            status = FwpsFlowAssociateContext0(inMetaValues->flowHandle, FWPS_LAYER_STREAM_V4, g_CalloutIdStreamV4, g_FlowContextValue);
+            
+            if (NT_SUCCESS(status)) {
+                // Assume IPv4, record Destination IP and Port
+                if (inFixedValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V4_IP_REMOTE_ADDRESS].value.type == FWP_UINT32) {
+                    UINT32 destIp = inFixedValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V4_IP_REMOTE_ADDRESS].value.uint32;
+                    UINT16 destPort = inFixedValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V4_IP_REMOTE_PORT].value.uint16;
+                    
+                    KeAcquireSpinLock(&g_StatsLock, &oldIrql);
+                    g_Stats.DestIp = RtlUlongByteSwap(destIp);
+                    g_Stats.DestPort = RtlUshortByteSwap(destPort);
+                    KeReleaseSpinLock(&g_StatsLock, oldIrql);
+                }
             }
+        } else if (inFixedValues->layerId == FWPS_LAYER_ALE_FLOW_ESTABLISHED_V6) {
+            status = FwpsFlowAssociateContext0(inMetaValues->flowHandle, FWPS_LAYER_STREAM_V6, g_CalloutIdStreamV6, g_FlowContextValue);
+            // We ignore setting DestIp for IPv6 to keep it simple, controller will output "ANY" if DestIp == 0
         }
     }
 }
