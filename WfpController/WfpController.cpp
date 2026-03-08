@@ -174,6 +174,10 @@ int wmain(int argc, wchar_t* argv[]) {
     wcout << L"DST=" << wstring(resultStrDst.begin(), resultStrDst.end()) << endl;
     wcout << L"TX_BYTES=" << statsOut.TxBytes << endl;
     wcout << L"RX_BYTES=" << statsOut.RxBytes << endl;
+    wcout << L"DEBUG ALE CALLS=" << statsOut.DebugCallAle << endl;
+    wcout << L"DEBUG PID MATCHES=" << statsOut.DebugMatchPid << endl;
+    wcout << L"DEBUG STREAM CALLS=" << statsOut.DebugCallStream << endl;
+    wcout << L"DEBUG CONTEXT MATCHES=" << statsOut.DebugMatchContext << endl;
     wcout << L"--------------------------------------" << endl;
 
     // Write to result.txt (in current directory)

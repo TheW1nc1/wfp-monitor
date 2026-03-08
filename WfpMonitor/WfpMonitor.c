@@ -412,6 +412,11 @@ void AleFlowEstablishedClassify(
     UNREFERENCED_PARAMETER(flowContext);
 
     classifyOut->actionType = FWP_ACTION_PERMIT;
+    
+    KIRQL oldIrql;
+    KeAcquireSpinLock(&g_StatsLock, &oldIrql);
+    g_Stats.DebugCallAle++;
+    KeReleaseSpinLock(&g_StatsLock, oldIrql);
 
     if ((classifyOut->rights & FWPS_RIGHT_ACTION_WRITE) == 0) return;
 
@@ -431,6 +436,10 @@ void AleFlowEstablishedClassify(
 
     // If target PID matches, we monitor this flow
     if (targetPid > 0 && processId == targetPid) {
+        
+        KeAcquireSpinLock(&g_StatsLock, &oldIrql);
+        g_Stats.DebugMatchPid++;
+        KeReleaseSpinLock(&g_StatsLock, oldIrql);
         
         // Setup flow context according to IPv4 or IPv6
         NTSTATUS status;
@@ -480,9 +489,19 @@ void StreamClassify(
     UNREFERENCED_PARAMETER(filter);
 
     classifyOut->actionType = FWP_ACTION_PERMIT;
+    
+    KIRQL oldIrql;
+    KeAcquireSpinLock(&g_StatsLock, &oldIrql);
+    g_Stats.DebugCallStream++;
+    KeReleaseSpinLock(&g_StatsLock, oldIrql);
+    
     if ((classifyOut->rights & FWPS_RIGHT_ACTION_WRITE) == 0) return;
 
     if (flowContext == g_FlowContextValue) {
+        KeAcquireSpinLock(&g_StatsLock, &oldIrql);
+        g_Stats.DebugMatchContext++;
+        KeReleaseSpinLock(&g_StatsLock, oldIrql);
+        
         FWPS_STREAM_CALLOUT_IO_PACKET0* streamPacket = (FWPS_STREAM_CALLOUT_IO_PACKET0*)layerData;
         if (streamPacket && streamPacket->streamData != NULL && streamPacket->streamData->dataLength > 0) {
             

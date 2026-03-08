@@ -29,4 +29,8 @@ typedef struct _WFP_MONITOR_STATS_OUT {
     ULONG64 RxBytes;
     ULONG DestIp;     // IPv4 network byte order
     USHORT DestPort;  // Network byte order
+    ULONG DebugCallAle;
+    ULONG DebugMatchPid;
+    ULONG DebugCallStream;
+    ULONG DebugMatchContext;
 } WFP_MONITOR_STATS_OUT, *PWFP_MONITOR_STATS_OUT;
