@@ -15,5 +15,7 @@ find_package(WDK REQUIRED)
 
 wdk_add_driver(WfpMonitor WfpMonitor/WfpMonitor.c)
 
-# 链接 WFP 需要的内核库 (ntoskrnl.lib 被 wdk_add_driver 自动包含)
-target_link_libraries(WfpMonitor PRIVATE fwpkclnt.lib)
+# 链接 WFP 需要的内核库。
+# FindWDK 为 WDK Lib 目录中的所有 .lib 生成了 WDK::LIBNAME 格式的导入目标。
+# 使用 plain 风格 (不带 PRIVATE 关键字) 以兼容 FindWdk.cmake 内部的 plain风格调用。
+target_link_libraries(WfpMonitor WDK::FWPKCLNT)

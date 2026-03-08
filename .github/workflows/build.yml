@@ -14,8 +14,6 @@ jobs:
     steps:
     - name: Checkout Code
       uses: actions/checkout@v4
-      with:
-        submodules: recursive
 
     - name: Setup MSVC
       uses: ilammy/msvc-dev-cmd@v1
@@ -27,9 +25,7 @@ jobs:
         Invoke-WebRequest -Uri "https://go.microsoft.com/fwlink/?linkid=2166289" -OutFile "wdksetup.exe"
         Write-Host "Installing WDK silently..."
         $proc = Start-Process -FilePath ".\wdksetup.exe" -ArgumentList "/q" -Wait -PassThru
-        if ($proc.ExitCode -ne 0) {
-            Write-Warning "WDK Setup exited with code $($proc.ExitCode)"
-        }
+        Write-Host "WDK Setup exited with code $($proc.ExitCode)"
         Write-Host "WDK Setup Complete."
 
     - name: Configure CMake
@@ -43,5 +39,5 @@ jobs:
       with:
         name: WFP-Compiled-Binaries
         path: |
-          build/Release/*.exe
-          build/Release/*.sys
+          build/Release/WfpController.exe
+          build/Release/WfpMonitor.sys
