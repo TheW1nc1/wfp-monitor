@@ -28,10 +28,5 @@ message(STATUS "Using WDK version: ${WDK_VERSION}")
 
 wdk_add_driver(WfpMonitor WfpMonitor/WfpMonitor.c)
 
-# Force C++ compilation for WfpMonitor.c to work around WDK 26100 fwpsk.h bug.
-# In C mode, repeated typedef of 'IF_INDEX' is illegal (C2370).
-# In C++ mode, identical typedef redefinitions are allowed.
-set_source_files_properties(WfpMonitor/WfpMonitor.c PROPERTIES LANGUAGE CXX)
-
 # Link WFP kernel library using FindWDK's generated IMPORTED target (plain style)
 target_link_libraries(WfpMonitor WDK::FWPKCLNT)

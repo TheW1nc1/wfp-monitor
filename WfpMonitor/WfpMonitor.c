@@ -1,15 +1,6 @@
-// Compiled as C++ to work around WDK 26100 fwpsk.h IF_INDEX redefinition bug.
-// In C mode, repeated typedef of same name is illegal; C++ allows it.
-// All functions are wrapped with extern "C" to maintain C linkage for
-// kernel-mode symbol resolution (DriverEntry, etc.).
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <ntddk.h>
 #pragma warning(push)
 #pragma warning(disable:4201)       // unnamed struct/union
-#pragma warning(disable:4324)       // structure was padded
 #include <fwpsk.h>
 #pragma warning(pop)
 #include <fwpmk.h>
@@ -433,7 +424,3 @@ void StreamFlowDelete(UINT16 layerId, UINT32 calloutId, UINT64 flowContext)
     UNREFERENCED_PARAMETER(calloutId);
     UNREFERENCED_PARAMETER(flowContext);
 }
-
-#ifdef __cplusplus
-} // extern "C"
-#endif
