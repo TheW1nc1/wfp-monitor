@@ -221,6 +221,7 @@ NTSTATUS WfpMonitorDeviceControl(PDEVICE_OBJECT DeviceObject, PIRP Irp)
 }
 
 // GUIDs
+#include <initguid.h>
 // {A55F5A11-E623-45C1-A528-56BCA6FD8B2A}
 DEFINE_GUID(WFP_MONITOR_CALLOUT_ALE_FLOW_V4, 0xa55f5a11, 0xe623, 0x45c1, 0xa5, 0x28, 0x56, 0xbc, 0xa6, 0xfd, 0x8b, 0x2a);
 // {B66F6B22-E623-45C1-A528-56BCA6FD8B2B}
@@ -233,8 +234,8 @@ NTSTATUS RegisterCallouts(DEVICE_OBJECT* deviceObject)
     // 1. ALE Flow Established Callout structure
     FWPS_CALLOUT0 calloutAle = { 0 };
     calloutAle.calloutKey = WFP_MONITOR_CALLOUT_ALE_FLOW_V4;
-    calloutAle.classifyFn = AleFlowEstablishedClassify;
-    calloutAle.notifyFn = AleFlowEstablishedNotify;
+    calloutAle.classifyFn = (FWPS_CALLOUT_CLASSIFY_FN0)AleFlowEstablishedClassify;
+    calloutAle.notifyFn = (FWPS_CALLOUT_NOTIFY_FN0)AleFlowEstablishedNotify;
     calloutAle.flowDeleteFn = NULL;
 
     status = FwpsCalloutRegister0(deviceObject, &calloutAle, &g_CalloutIdAleFlowV4);
@@ -243,9 +244,9 @@ NTSTATUS RegisterCallouts(DEVICE_OBJECT* deviceObject)
     // Stream Callout structure
     FWPS_CALLOUT0 calloutStream = { 0 };
     calloutStream.calloutKey = WFP_MONITOR_CALLOUT_STREAM_V4;
-    calloutStream.classifyFn = StreamClassify;
-    calloutStream.notifyFn = StreamNotify;
-    calloutStream.flowDeleteFn = StreamFlowDelete;
+    calloutStream.classifyFn = (FWPS_CALLOUT_CLASSIFY_FN0)StreamClassify;
+    calloutStream.notifyFn = (FWPS_CALLOUT_NOTIFY_FN0)StreamNotify;
+    calloutStream.flowDeleteFn = (FWPS_CALLOUT_FLOW_DELETE_NOTIFY_FN0)StreamFlowDelete;
 
     status = FwpsCalloutRegister0(deviceObject, &calloutStream, &g_CalloutIdStreamV4);
     if (!NT_SUCCESS(status)) return status;
