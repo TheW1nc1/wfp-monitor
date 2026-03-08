@@ -259,6 +259,7 @@ NTSTATUS RegisterCallouts(DEVICE_OBJECT* deviceObject)
     calloutStream.classifyFn = (FWPS_CALLOUT_CLASSIFY_FN0)StreamClassify;
     calloutStream.notifyFn = (FWPS_CALLOUT_NOTIFY_FN0)StreamNotify;
     calloutStream.flowDeleteFn = (FWPS_CALLOUT_FLOW_DELETE_NOTIFY_FN0)StreamFlowDelete;
+    calloutStream.flags = FWP_CALLOUT_FLAG_USES_STREAM_INSPECTION;
     status = FwpsCalloutRegister0(deviceObject, &calloutStream, &g_CalloutIdStreamV4);
     if (!NT_SUCCESS(status)) return status;
 
@@ -277,6 +278,7 @@ NTSTATUS RegisterCallouts(DEVICE_OBJECT* deviceObject)
     calloutStreamV6.classifyFn = (FWPS_CALLOUT_CLASSIFY_FN0)StreamClassify;
     calloutStreamV6.notifyFn = (FWPS_CALLOUT_NOTIFY_FN0)StreamNotify;
     calloutStreamV6.flowDeleteFn = (FWPS_CALLOUT_FLOW_DELETE_NOTIFY_FN0)StreamFlowDelete;
+    calloutStreamV6.flags = FWP_CALLOUT_FLAG_USES_STREAM_INSPECTION;
     status = FwpsCalloutRegister0(deviceObject, &calloutStreamV6, &g_CalloutIdStreamV6);
     if (!NT_SUCCESS(status)) return status;
 

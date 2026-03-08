@@ -74,20 +74,30 @@ jobs:
         echo "[*] Signing the WFP Kernel Driver"
         & "C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\signtool.exe" sign /fd SHA256 /a /f cert.pfx /p "test" build\Release\WfpMonitor.sys
         
-        echo "[*] Running Controller against built-in CURL (Baseline Test)"
-        Start-Process -FilePath "build\Release\WfpController.exe" -ArgumentList "C:\Windows\System32\curl.exe `"http://www.example.com`"" -NoNewWindow -Wait
+    - name: Run Tests (curl and test.exe)
+      shell: powershell
+      run: |
+        # Pre-install and start driver once to avoid service flapping
+        $driverPath = (Resolve-Path "build\Release\WfpMonitor.sys").Path
+        $sc = "C:\Windows\System32\sc.exe"
+        & $sc create WfpMonitor binPath= $driverPath type= kernel start= demand
+        & $sc start WfpMonitor
         
-        echo "[*] Dumping output of CURL test result..."
+        echo "[*] Running Controller against CURL (Baseline)"
+        # Note: We now use a special flag or just trust the controller won't try to reinstall if it sees it
+        Start-Process -FilePath "build\Release\WfpController.exe" -ArgumentList "C:\Windows\System32\curl.exe `"http://www.example.com`"" -NoNewWindow -Wait
         if (Test-Path result.txt) { Get-Content result.txt ; Rename-Item result.txt result_curl.txt }
         
         echo "==============================================="
         
-        echo "[*] Running Controller and Test Target"
+        echo "[*] Running Controller against test.exe"
         $testExePath = Resolve-Path "test.exe" | Select-Object -ExpandProperty Path
         Start-Process -FilePath "build\Release\WfpController.exe" -ArgumentList "`"$testExePath`"" -NoNewWindow -Wait
-        
-        echo "[*] Dumping output of test.exe result..."
         if (Test-Path result.txt) { Get-Content result.txt } else { echo "result.txt not found!" }
+        
+        # Cleanup
+        & $sc stop WfpMonitor
+        & $sc delete WfpMonitor
         
     - name: Upload Genuine Output Data
       uses: actions/upload-artifact@v4
