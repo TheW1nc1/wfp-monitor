@@ -84,7 +84,7 @@ jobs:
         & $sc start WfpMonitor
         
         echo "[*] Running Controller against CURL (Baseline)"
-        # Note: We now use a special flag or just trust the controller won't try to reinstall if it sees it
+        $env:WFP_SKIP_DRIVER_MGMT = "1"
         Start-Process -FilePath "build\Release\WfpController.exe" -ArgumentList "C:\Windows\System32\curl.exe `"http://www.example.com`"" -NoNewWindow -Wait
         if (Test-Path result.txt) { Get-Content result.txt ; Rename-Item result.txt result_curl.txt }
         

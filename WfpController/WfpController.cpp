@@ -101,10 +101,22 @@ int wmain(int argc, wchar_t* argv[]) {
     GetCurrentDirectoryW(MAX_PATH, currentDir);
     wstring driverPath = wstring(currentDir) + L"\\WfpMonitor.sys";
 
-    wcout << L"[*] Installing WfpMonitor driver..." << endl;
-    if (!ManageDriver(L"WfpMonitor", driverPath, true)) {
-        wcout << L"[-] Failed to load WfpMonitor driver. Ensure you run as Administrator." << endl;
-        return 1;
+    bool skipMgmt = false;
+    char* skipEnv = nullptr;
+    size_t envLen = 0;
+    if (_dupenv_s(&skipEnv, &envLen, "WFP_SKIP_DRIVER_MGMT") == 0 && skipEnv != nullptr) {
+        if (string(skipEnv) == "1") skipMgmt = true;
+        free(skipEnv);
+    }
+
+    if (!skipMgmt) {
+        wcout << L"[*] Installing WfpMonitor driver..." << endl;
+        if (!ManageDriver(L"WfpMonitor", driverPath, true)) {
+            wcout << L"[-] Failed to load WfpMonitor driver. Ensure you run as Administrator." << endl;
+            return 1;
+        }
+    } else {
+        wcout << L"[*] Skipping driver management as requested." << endl;
     }
 
     HANDLE hDevice = CreateFileW(WFP_MONITOR_SYMLINK_NAME, GENERIC_READ | GENERIC_WRITE,
@@ -153,8 +165,12 @@ int wmain(int argc, wchar_t* argv[]) {
 
     CloseHandle(hDevice);
 
-    wcout << L"[*] Stopping and uninstalling driver..." << endl;
-    ManageDriver(L"WfpMonitor", driverPath, false);
+    if (!skipMgmt) {
+        wcout << L"[*] Stopping and uninstalling driver..." << endl;
+        ManageDriver(L"WfpMonitor", driverPath, false);
+    } else {
+        wcout << L"[*] Skipping driver uninstallation as requested." << endl;
+    }
 
     // Format results
     string resultStrDst = "ANY";
