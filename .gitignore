@@ -1,0 +1,19 @@
+# Build output directory
+build/
+out/
+
+# CMake generated files
+CMakeCache.txt
+CMakeFiles/
+
+# Visual Studio files
+*.user
+*.suo
+.vs/
+
+# Driver build artifacts
+*.sys
+*.pdb
+*.obj
+*.lib
+*.exp
