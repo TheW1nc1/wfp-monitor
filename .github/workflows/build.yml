@@ -1,0 +1,45 @@
+name: Build WFP Driver and Controller
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-2022
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Setup MSVC
+      uses: ilammy/msvc-dev-cmd@v1
+
+    - name: Download and Install WDK (Windows Driver Kit)
+      shell: powershell
+      run: |
+        Write-Host "Downloading WDK 11..."
+        Invoke-WebRequest -Uri "https://go.microsoft.com/fwlink/?linkid=2166289" -OutFile "wdksetup.exe"
+        Write-Host "Installing WDK silently..."
+        $proc = Start-Process -FilePath ".\wdksetup.exe" -ArgumentList "/q" -Wait -PassThru
+        if ($proc.ExitCode -ne 0) {
+            Write-Warning "WDK Setup exited with code $($proc.ExitCode)"
+        }
+        Write-Host "WDK Setup Complete."
+
+    - name: Configure CMake
+      run: cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+
+    - name: Build Project
+      run: cmake --build build --config Release
+
+    - name: Upload Binaries
+      uses: actions/upload-artifact@v4
+      with:
+        name: WFP-Compiled-Binaries
+        path: |
+          build/Release/*.exe
+          build/Release/*.sys

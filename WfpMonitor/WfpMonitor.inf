@@ -1,0 +1,41 @@
+[Version]
+Signature   = "$WINDOWS NT$"
+Class       = WFPCALLOUTS
+ClassGuid   = {57465043-616C-6C6F-7574-730000000000}
+Provider    = %ProviderString%
+CatalogFile = WfpMonitor.cat
+DriverVer   = 10/01/2023,1.0.0.0
+
+[SourceDisksNames]
+1 = %WfpMonitorDisk%,,,""
+
+[SourceDisksFiles]
+WfpMonitor.sys = 1,,
+
+[DestinationDirs]
+DefaultDestDir = 12 ; %windir%\system32\drivers
+
+[DefaultInstall]
+OptionDesc          = %WfpMonitorServiceDesc%
+CopyFiles           = WfpMonitor.DriverFiles
+Service             = WfpMonitor
+
+[DefaultInstall.Services]
+AddService          = WfpMonitor,,WfpMonitor.Service
+
+[WfpMonitor.DriverFiles]
+WfpMonitor.sys,,,0x00000040 ; COPYFLG_OVERWRITE_OLDER
+
+[WfpMonitor.Service]
+DisplayName         = %WfpMonitorServiceName%
+Description         = %WfpMonitorServiceDesc%
+ServiceType         = 1 ; SERVICE_KERNEL_DRIVER
+StartType           = 3 ; SERVICE_DEMAND_START
+ErrorControl        = 1 ; SERVICE_ERROR_NORMAL
+ServiceBinary       = %12%\WfpMonitor.sys
+
+[Strings]
+ProviderString         = "WFP Monitor Test"
+WfpMonitorDisk         = "WFP Monitor Installation Disk"
+WfpMonitorServiceDesc  = "WFP Monitor Driver Service"
+WfpMonitorServiceName  = "WfpMonitor"
