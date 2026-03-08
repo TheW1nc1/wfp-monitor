@@ -1,6 +1,8 @@
 #include <ntddk.h>
+#include <netiodef.h>   // Pre-define IF_INDEX before fwpsk.h to prevent C2370 redefinition
 #pragma warning(push)
 #pragma warning(disable:4201)       // unnamed struct/union
+#pragma warning(disable:4324)       // structure was padded due to alignment specifier
 #include <fwpsk.h>
 #pragma warning(pop)
 #include <fwpmk.h>

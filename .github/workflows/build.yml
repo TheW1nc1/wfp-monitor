@@ -18,20 +18,22 @@ jobs:
     - name: Setup MSVC
       uses: ilammy/msvc-dev-cmd@v1
 
-    - name: Download and Install WDK (Windows Driver Kit)
+    - name: Download and Install WDK 10.0.22621 (Win11 22H2 - Stable)
       shell: powershell
       run: |
-        Write-Host "Downloading WDK 11..."
-        Invoke-WebRequest -Uri "https://go.microsoft.com/fwlink/?linkid=2166289" -OutFile "wdksetup.exe"
+        Write-Host "Downloading WDK 10.0.22621..."
+        # Using WDK for Windows 11 22H2 (10.0.22621) - avoids IF_INDEX conflict in 26100
+        Invoke-WebRequest -Uri "https://go.microsoft.com/fwlink/?linkid=2196230" -OutFile "wdksetup.exe"
         Write-Host "Installing WDK silently..."
         $proc = Start-Process -FilePath ".\wdksetup.exe" -ArgumentList "/q" -Wait -PassThru
         Write-Host "WDK Setup exited with code $($proc.ExitCode)"
-        Write-Host "WDK Setup Complete."
 
     - name: Configure CMake
+      shell: cmd
       run: cmake -S . -B build -G "Visual Studio 17 2022" -A x64
 
     - name: Build Project
+      shell: cmd
       run: cmake --build build --config Release
 
     - name: Upload Binaries
