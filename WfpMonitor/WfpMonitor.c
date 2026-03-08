@@ -1,6 +1,7 @@
 #include <ntddk.h>
 #pragma warning(push)
 #pragma warning(disable:4201)       // unnamed struct/union
+#include <ndis.h>           // Required for NDIS_HANDLE used in fwpsk.h
 #include <fwpsk.h>
 #pragma warning(pop)
 #include <fwpmk.h>
