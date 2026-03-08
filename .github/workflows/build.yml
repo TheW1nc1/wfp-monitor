@@ -18,47 +18,38 @@ jobs:
     - name: Setup MSVC
       uses: ilammy/msvc-dev-cmd@v1
 
-    - name: Install WDK 22621 via NuGet
+    - name: Install WDK 22621 and Remove WDK 26100
       shell: powershell
       run: |
-        Write-Host "=== Installing WDK 22621 via NuGet ==="
-        nuget install Microsoft.Windows.WDK.x64 -Version 10.0.22621.0 -OutputDirectory C:\wdk22621 -NonInteractive -Verbosity quiet
-
-        $pkg = "C:\wdk22621\Microsoft.Windows.WDK.x64.10.0.22621.0"
-        if (-not (Test-Path $pkg)) {
-          # Fallback: find any installed version
-          $pkg = Get-ChildItem "C:\wdk22621\Microsoft.Windows.WDK*" -Directory | Select-Object -First 1 -ExpandProperty FullName
+        Write-Host "=== Step 1: Remove WDK 26100 headers to avoid IF_INDEX conflict ==="
+        $wdk26100inc = "C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0"
+        $wdk26100lib = "C:\Program Files (x86)\Windows Kits\10\Lib\10.0.26100.0"
+        if (Test-Path $wdk26100inc) {
+          Rename-Item $wdk26100inc "${wdk26100inc}_disabled" -Force
+          Write-Host "Renamed WDK 26100 Include dir to _disabled"
+        }
+        if (Test-Path $wdk26100lib) {
+          Rename-Item $wdk26100lib "${wdk26100lib}_disabled" -Force
+          Write-Host "Renamed WDK 26100 Lib dir to _disabled"
         }
 
-        Write-Host "Package path: $pkg"
-        Write-Host "Package contents:"
-        Get-ChildItem $pkg -Recurse -Depth 2 | Select-Object FullName | ForEach-Object { Write-Host "  $($_.FullName)" }
+        Write-Host "=== Step 2: Download WDK 22621 (VS2022 compatible) from Microsoft ==="
+        # Official Microsoft link for WDK 10.0.22621.2428 (VS2022)
+        # from https://learn.microsoft.com/en-us/windows-hardware/drivers/legacy-wdk-downloads
+        $wdkUrl = "https://go.microsoft.com/fwlink/?linkid=2249371"
+        Invoke-WebRequest -Uri $wdkUrl -OutFile "wdksetup.exe" -UseBasicParsing
+        Write-Host "Downloaded wdksetup.exe, size: $((Get-Item wdksetup.exe).Length) bytes"
 
-        # Determine include and lib paths inside the package
-        $incKm   = Get-ChildItem $pkg -Recurse -Filter "ntddk.h" | Select-Object -First 1 -ExpandProperty DirectoryName
-        $libKm   = Get-ChildItem $pkg -Recurse -Filter "ntoskrnl.lib" | Select-Object -First 1 -ExpandProperty DirectoryName
-        $incShared = Join-Path (Split-Path $incKm -Parent) "shared"
+        Write-Host "=== Step 3: Install WDK 22621 silently ==="
+        $proc = Start-Process -FilePath ".\wdksetup.exe" -ArgumentList "/quiet /norestart" -Wait -PassThru
+        Write-Host "WDK installer exited with code: $($proc.ExitCode)"
 
-        Write-Host "Found km includes at: $incKm"
-        Write-Host "Found km libs at:     $libKm"
-
-        # Create expected directory structure for FindWDK
+        Write-Host "=== Step 4: Verify WDK 22621 installation ==="
         $wdkBase = "C:\Program Files (x86)\Windows Kits\10"
-        New-Item -ItemType Directory -Force "$wdkBase\Include\10.0.22621.0\km"     | Out-Null
-        New-Item -ItemType Directory -Force "$wdkBase\Include\10.0.22621.0\shared" | Out-Null
-        New-Item -ItemType Directory -Force "$wdkBase\Lib\10.0.22621.0\km\x64"    | Out-Null
-
-        # Copy all headers
-        Copy-Item "$incKm\*" "$wdkBase\Include\10.0.22621.0\km\" -Recurse -Force
-        if (Test-Path $incShared) {
-          Copy-Item "$incShared\*" "$wdkBase\Include\10.0.22621.0\shared\" -Recurse -Force
+        Get-ChildItem "$wdkBase\Include" -Directory -ErrorAction SilentlyContinue | ForEach-Object {
+          $ntddk = Join-Path $_.FullName "km\ntddk.h"
+          if (Test-Path $ntddk) { Write-Host "  Found WDK: $($_.Name)" }
         }
-        # Copy kernel lib files
-        Copy-Item "$libKm\*" "$wdkBase\Lib\10.0.22621.0\km\x64\" -Recurse -Force
-
-        Write-Host "WDK 22621 setup complete!"
-        $ntddk = "$wdkBase\Include\10.0.22621.0\km\ntddk.h"
-        Write-Host "ntddk.h exists: $(Test-Path $ntddk)"
 
     - name: Configure CMake
       shell: cmd
