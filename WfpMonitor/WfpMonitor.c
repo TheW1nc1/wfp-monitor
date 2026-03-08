@@ -427,7 +427,6 @@ void AleFlowEstablishedClassify(
 
     ULONG processId = (ULONG)inMetaValues->processId;
     
-    KIRQL oldIrql;
     ULONG targetPid;
     
     KeAcquireSpinLock(&g_StatsLock, &oldIrql);
@@ -507,7 +506,6 @@ void StreamClassify(
             
             UINT32 direction = inFixedValues->incomingValue[FWPS_FIELD_STREAM_V4_DIRECTION].value.uint32;
             
-            KIRQL oldIrql;
             KeAcquireSpinLock(&g_StatsLock, &oldIrql);
             if (direction == FWP_DIRECTION_OUTBOUND) {
                 g_Stats.TxBytes += streamPacket->streamData->dataLength;
