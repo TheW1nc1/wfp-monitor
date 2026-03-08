@@ -1,64 +1,62 @@
-# WFP 流量监控组件
+# WFP Traffic Monitor Project
 
-本项目是一个基于 Windows Filtering Platform (WFP) 的流量监控组件，包含内核态的 WFP Callout 驱动 (`WfpMonitor.sys`) 和 用户态的控制程序 (`WfpController.exe`)。它用于统计指定目标进程（如 `test.exe`）在运行期间产生的 TCP 总出口流量（TX_BYTES）和总入口流量（RX_BYTES）。
+This project implements a Windows kernel-mode driver (`WfpMonitor.sys`) and a user-mode application (`WfpController.exe`) using the Windows Filtering Platform (WFP) to intercept and monitor network traffic (Tx/Rx bytes) for a specified process (`test.exe`) during its lifecycle.
 
-**当前工程已重构为基于 CMake 的配置，专为 JetBrains CLion 环境优化。**
+## Architecture
 
-## 1. 依赖信息
+*   **User-Mode Controller (`WfpController.exe`):**
+    *   Takes the target executable path and optional arguments (e.g., ping).
+    *   Installs and starts the `WfpMonitor` service.
+    *   Retrieves the Process ID (PID) of the spawned target process.
+    *   Communicates with the kernel driver via `DeviceIoControl` to register the target PID and poll for traffic statistics.
+    *   Logs the final network traffic statistics when the process terminates.
 
-- **操作系统要求**：Windows 10 x64 或更高版本。
-- **开发工具**：
-  - JetBrains **CLion** (支持 CMake 构建)。
-  - 已安装 Visual Studio 的 C++ / MSVC Build Tools。
-  - **Windows Driver Kit (WDK)** 10（需与 SDK 版本匹配）。
-- **测试环境**：
-  - 测试用的 Windows 虚拟机必须开启 **测试签名模式 (Testsigning)**。
-  - 需要以**管理员权限**运行控制程序。
+*   **Kernel-Mode Driver (`WfpMonitor.sys`):**
+    *   Registers WFP Callouts at two layers:
+        1.  `FWPM_LAYER_ALE_FLOW_ESTABLISHED_V4`: Captures the flow establishment to associate network connections (FlowContexts) with the target PID.
+        2.  `FWPM_LAYER_STREAM_V4`: Monitors the actual data transfer (TCP/UDP streams) and accumulates Tx/Rx bytes in a lock-protected shared structure.
+    *   Exposes an IOCTL interface to receive the target PID from the user mode and to return the accumulated traffic statistics.
 
-## 2. 架构说明
+## Environment Requirements
 
-### 内核态驱动 (`WfpMonitor.sys`)
-- 注册了两个 WFP Callout：
-  1. `FWPM_LAYER_ALE_FLOW_ESTABLISHED_V4`：拦截新建的连接，匹配目标进程的 PID。匹配后记录 DST。
-  2. `FWPM_LAYER_STREAM_V4`：拦截数据流计算流量。利用 `FWP_DIRECTION_OUTBOUND` 及方向获取流量字节。
+*   **Target OS:** Windows 10/11 (x64)
+*   **WDK Version:** 10.0.22621.0 (Specified explicitly for stable build environments)
+*   **Build System:** CMake + MSVC Compiler
 
-### 用户态程序 (`WfpController.exe`)
-- 启动 `test.exe`，动态注册并下达 PID，最后获取统计信息（`IOCTL_WFP_MONITOR_GET_STATS`），写出到 `result.txt`。
+## Compilation Instructions
 
-## 3. 构建步骤（CLion / CMake）
+This project includes a fully automated GitHub Actions CI/CD pipeline (`.github/workflows/build.yml`) that guarantees a clean environment and explicitly downloads/installs the required WDK 22621 to avoid pre-installed WDK bugs on generic runners.
 
-### 在 CLion 中构建
-1. 在 CLion 中通过 `File -> Open` 选择 `CMakeLists.txt` 所在的 `WfpProject` 根目录。
-2. 确保配置里的 Toolchain 使用了本地的 **MSVC** x64 AMD64 工具链。
-3. 等待 CMake 刷新，此时 WfpController 已经具备编译条件。项目结构可以正常进行代码阅读和补全（IntelliSense 支持）。
-4. **针对 Driver (WfpMonitor) 的构建**：
-   - 默认的 CMake 能满足常规 C++ 的解析以及 WfpController 控制器的编译。
-   - 若要实现针对 `.sys` 的原生完整编译，通常可以使用业界通用的第三方 WDK CMake 插件（如 `FindWDK`），或者在装有 WDK 的系统上使用 EWDK MSBuild 命令进行生成。
+To compile locally:
+1.  Ensure Visual Studio 2022 and WDK 10.0.22621.0 are installed.
+2.  Open a Developer Command Prompt.
+3.  Run CMake to configure and build:
+    ```cmd
+    cmake -B build -G "Visual Studio 17 2022" -A x64
+    cmake --build build --config Release
+    ```
 
-## 4. 运行步骤（测试指南）
+## Testing and Execution Instructions
 
-### 4.1 虚拟机准备
-在用于测试的 Windows 虚拟机中，请确保已打开测试模式（驱动未签名）：
-1. 以管理员身份运行 CMD。
-2. 执行以下命令：
-   ```cmd
-   bcdedit /set testsigning on
-   ```
-3. 重启虚拟机。
+**IMPORTANT:** Kernel drivers that are not signed with a Microsoft WHQL certificate will not be loaded by default Windows installations. **This must be executed in a dedicated testing Virtual Machine.**
 
-### 4.2 执行测试
-1. 将编译好的 `WfpMonitor.sys` 和 `WfpController.exe` 放置在 **同一个目录下**。
-2. 将你需要测试的 `test.exe` 也复制到当前环境。
-3. **以管理员权限** 运行命令提示符 (CMD) 或 PowerShell。
-4. 切换到程序所在目录，执行如下命令：
-   ```cmd
-   WfpController.exe path\to\test.exe
-   ```
+1.  **Enable Test-Signing Mode:**
+    On the testing VM, open an Administrator Command Prompt and run:
+    ```cmd
+    bcdedit /set testsigning on
+    ```
+    Restart the VM. You should see a "Test Mode" watermark in the bottom right corner of the desktop.
 
-### 4.3 产出与验收
-程序执行过程中会自动安装驱动、拉起并监控 `test.exe`，结束后写入 `result.txt`，内容格式如下：
-```txt
-DST=127.0.0.1:5566
-TX_BYTES=1024
-RX_BYTES=2048
-```
+2.  **Deploy the Binaries:**
+    Copy the compiled `WfpMonitor.sys` and `WfpController.exe` (from the GitHub Actions `WFP-Compiled-Binaries` artifact or your local build) into the same directory on the testing VM.
+
+3.  **Run the Controller:**
+    Open an **Administrator Command Prompt** in the directory where the binaries are located.
+    Provide the path to an executable you want to monitor (e.g., the built-in `ping.exe`).
+
+    ```cmd
+    .\WfpController.exe C:\Windows\System32\PING.EXE "www.microsoft.com"
+    ```
+
+4.  **Expected Output:**
+    The controller will install the driver, launch the target process, and wait for it to finish. Once `ping.exe` completes, the controller will query the driver and print/log the exact number of incoming (Rx) and outgoing (Tx) bytes that the process generated during its execution.
