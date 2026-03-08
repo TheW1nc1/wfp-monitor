@@ -1,3 +1,7 @@
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <ntddk.h>
 #pragma warning(push)
 #pragma warning(disable:4201)       // unnamed struct/union
@@ -425,3 +429,7 @@ void StreamFlowDelete(UINT16 layerId, UINT32 calloutId, UINT64 flowContext)
     UNREFERENCED_PARAMETER(calloutId);
     UNREFERENCED_PARAMETER(flowContext);
 }
+
+#ifdef __cplusplus
+}
+#endif
