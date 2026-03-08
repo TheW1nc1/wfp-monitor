@@ -25,12 +25,12 @@ jobs:
         $wdk26100inc = "C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0"
         $wdk26100lib = "C:\Program Files (x86)\Windows Kits\10\Lib\10.0.26100.0"
         if (Test-Path $wdk26100inc) {
-          Rename-Item $wdk26100inc "${wdk26100inc}_disabled" -Force
-          Write-Host "Renamed WDK 26100 Include dir to _disabled"
+          Remove-Item -Recurse -Force $wdk26100inc
+          Write-Host "Removed WDK 26100 Include dir"
         }
         if (Test-Path $wdk26100lib) {
-          Rename-Item $wdk26100lib "${wdk26100lib}_disabled" -Force
-          Write-Host "Renamed WDK 26100 Lib dir to _disabled"
+          Remove-Item -Recurse -Force $wdk26100lib
+          Write-Host "Removed WDK 26100 Lib dir"
         }
 
         Write-Host "=== Step 2: Download WDK 22621 (VS2022 compatible) from Microsoft ==="
@@ -53,7 +53,8 @@ jobs:
 
     - name: Configure CMake
       shell: cmd
-      run: cmake -S . -B build -G "Visual Studio 17 2022" -A x64
+      # Force use of SDK version 10.0.22621.0 to match the WDK we just installed
+      run: cmake -S . -B build -G "Visual Studio 17 2022" -A x64 -T version=10.0.22621.0
 
     - name: Build Project
       shell: cmd
