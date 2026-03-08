@@ -1,5 +1,4 @@
 #include <ntddk.h>
-#include <wdf.h>
 #pragma warning(push)
 #pragma warning(disable:4201)       // unnamed struct/union
 #include <fwpsk.h>

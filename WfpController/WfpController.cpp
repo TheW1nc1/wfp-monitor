@@ -1,12 +1,17 @@
+#ifndef WIN32_LEAN_AND_MEAN
+#define WIN32_LEAN_AND_MEAN
+#endif
+#include <winsock2.h>
+#include <ws2tcpip.h>
 #include <windows.h>
 #include <iostream>
 #include <fstream>
 #include <string>
 #include <winsvc.h>
 #include <iphlpapi.h>
-#include <ws2tcpip.h>
 #include <tlhelp32.h>
 #pragma comment(lib, "Ws2_32.lib")
+#pragma comment(lib, "Iphlpapi.lib")
 
 #include "../WfpMonitor/WfpMonitor.h"
 
