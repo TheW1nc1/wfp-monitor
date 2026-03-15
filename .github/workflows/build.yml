@@ -76,19 +76,27 @@ jobs:
         
     - name: Run Final Test (test.exe)
       shell: powershell
+      timeout-minutes: 10
       run: |
+        echo "[*] CP1: Resolving driver path..."
         $driverPath = (Resolve-Path "build\Release\WfpMonitor.sys").Path
         $sc = "C:\Windows\System32\sc.exe"
+        
+        echo "[*] CP2: Registering WfpMonitor service..."
         & $sc create WfpMonitor binPath= $driverPath type= kernel start= demand
+        
+        echo "[*] CP3: Starting WfpMonitor service..."
         & $sc start WfpMonitor
         
+        echo "[*] CP4: Setting environment and resolving test.exe..."
         $env:WFP_SKIP_DRIVER_MGMT = "1"
         $testExePath = Resolve-Path "test.exe" | Select-Object -ExpandProperty Path
         
-        echo "[*] Running Controller against test.exe..."
-        # 5 minute timeout to prevent hangs
+        echo "[*] CP5: Running Controller against test.exe..."
+        # Controller now has its own internal 45s timeout as well
         Start-Process -FilePath "build\Release\WfpController.exe" -ArgumentList "`"$testExePath`"" -NoNewWindow -Wait
         
+        echo "[*] CP6: Checking for result.txt..."
         if (Test-Path result.txt) { 
            echo "[*] Capture Success! result.txt content:"
            Get-Content result.txt 
@@ -96,6 +104,7 @@ jobs:
            echo "[-] result.txt not found!" 
         }
         
+        echo "[*] CP7: Cleaning up driver..."
         & $sc stop WfpMonitor
         & $sc delete WfpMonitor
         

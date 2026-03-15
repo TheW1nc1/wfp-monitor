@@ -154,9 +154,14 @@ int wmain(int argc, wchar_t* argv[]) {
     }
 
     ResumeThread(pi.hThread);
-    wcout << L"[*] Waiting for process to terminate..." << endl;
-    WaitForSingleObject(pi.hProcess, INFINITE);
-    wcout << L"[*] Process exited." << endl;
+    wcout << L"[*] Waiting for process to terminate (Timeout: 45s)..." << endl;
+    DWORD waitResult = WaitForSingleObject(pi.hProcess, 45000); // 45 second timeout for CI safety
+    if (waitResult == WAIT_TIMEOUT) {
+        wcout << L"[-] Timeout waiting for process. Terminating..." << endl;
+        TerminateProcess(pi.hProcess, 1);
+    } else {
+        wcout << L"[*] Process exited normally." << endl;
+    }
 
     // Get Final Stats
     WFP_MONITOR_STATS_OUT statsOut = { 0 };
