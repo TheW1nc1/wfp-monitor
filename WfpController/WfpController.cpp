@@ -187,6 +187,14 @@ int wmain(int argc, wchar_t* argv[]) {
     wcout << L"Destination: " << wstring(resultStrDst.begin(), resultStrDst.end()) << endl;
     wcout << L"Sent: " << statsOut.TxBytes << L" bytes" << endl;
     wcout << L"Received: " << statsOut.RxBytes << L" bytes" << endl;
+    wcout << L"--- Debug Info ---" << endl;
+    wcout << L"ALE Calls: " << statsOut.DebugCallAle << endl;
+    wcout << L"PID Matches: " << statsOut.DebugMatchPid << endl;
+    wcout << L"Assoc Attempts: " << statsOut.DebugAssocAttempt << endl;
+    wcout << L"Assoc Status: 0x" << hex << statsOut.DebugAssocStatus << dec << endl;
+    wcout << L"Last Seen PID: " << statsOut.DebugLastSeenPid << endl;
+    wcout << L"Stream Calls: " << statsOut.DebugStreamCall << endl;
+    wcout << L"Context Matches: " << statsOut.DebugMatchContext << endl;
     wcout << L"-----------------------------------" << endl;
 
     // Write to result.txt (in current directory)
@@ -197,6 +205,10 @@ int wmain(int argc, wchar_t* argv[]) {
         outFile << "RX_BYTES=" << statsOut.RxBytes << "\n";
         outFile << "DEBUG_ALE_CALLS=" << statsOut.DebugCallAle << "\n";
         outFile << "DEBUG_PID_MATCHES=" << statsOut.DebugMatchPid << "\n";
+        outFile << "DEBUG_ASSOC_ATTEMPTS=" << statsOut.DebugAssocAttempt << "\n";
+        outFile << "DEBUG_ASSOC_STATUS=0x" << hex << statsOut.DebugAssocStatus << dec << "\n";
+        outFile << "DEBUG_LAST_SEEN_PID=" << statsOut.DebugLastSeenPid << "\n";
+        outFile << "DEBUG_STREAM_CALLS=" << statsOut.DebugStreamCall << "\n";
         outFile << "DEBUG_CONTEXT_MATCHES=" << statsOut.DebugMatchContext << "\n";
         outFile.close();
         wcout << L"[*] Results written to result.txt." << endl;

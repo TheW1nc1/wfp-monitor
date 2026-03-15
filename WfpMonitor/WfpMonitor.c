@@ -412,13 +412,17 @@ void AleFlowEstablishedClassify(
     UNREFERENCED_PARAMETER(flowContext);
 
     classifyOut->actionType = FWP_ACTION_PERMIT;
-    if ((classifyOut->rights & FWPS_RIGHT_ACTION_WRITE) == 0) return;
 
     KIRQL oldIrql;
     KeAcquireSpinLock(&g_StatsLock, &oldIrql);
     g_Stats.DebugCallAle++;
+    if (inMetaValues->currentMetadataValues & FWPS_METADATA_FIELD_PROCESS_ID) {
+        g_Stats.DebugLastSeenPid = (ULONG)inMetaValues->processId;
+    }
     KeReleaseSpinLock(&g_StatsLock, oldIrql);
 
+    // CRITICAL: We do association even if rights check fails (read-only mode)
+    // but we check for metadata availability first.
     if (!(inMetaValues->currentMetadataValues & FWPS_METADATA_FIELD_PROCESS_ID) ||
         !(inMetaValues->currentMetadataValues & FWPS_METADATA_FIELD_FLOW_HANDLE)) {
         return;
@@ -433,21 +437,29 @@ void AleFlowEstablishedClassify(
     if (targetPid > 0 && processId == targetPid) {
         KeAcquireSpinLock(&g_StatsLock, &oldIrql);
         g_Stats.DebugMatchPid++;
+        g_Stats.DebugAssocAttempt++;
         KeReleaseSpinLock(&g_StatsLock, oldIrql);
         
+        NTSTATUS status = STATUS_SUCCESS;
         if (inFixedValues->layerId == FWPS_LAYER_ALE_FLOW_ESTABLISHED_V4) {
-            FwpsFlowAssociateContext0(inMetaValues->flowHandle, FWPS_LAYER_STREAM_V4, g_CalloutIdStreamV4, g_FlowContextValue);
-            if (inFixedValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V4_IP_REMOTE_ADDRESS].value.type == FWP_UINT32) {
-                UINT32 destIp = inFixedValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V4_IP_REMOTE_ADDRESS].value.uint32;
-                UINT16 destPort = inFixedValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V4_IP_REMOTE_PORT].value.uint16;
-                KeAcquireSpinLock(&g_StatsLock, &oldIrql);
-                g_Stats.DestIp = RtlUlongByteSwap(destIp);
-                g_Stats.DestPort = RtlUshortByteSwap(destPort);
-                KeReleaseSpinLock(&g_StatsLock, oldIrql);
+            status = FwpsFlowAssociateContext0(inMetaValues->flowHandle, FWPS_LAYER_STREAM_V4, g_CalloutIdStreamV4, g_FlowContextValue);
+            if (NT_SUCCESS(status)) {
+                if (inFixedValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V4_IP_REMOTE_ADDRESS].value.type == FWP_UINT32) {
+                    UINT32 destIp = inFixedValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V4_IP_REMOTE_ADDRESS].value.uint32;
+                    UINT16 destPort = inFixedValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V4_IP_REMOTE_PORT].value.uint16;
+                    KeAcquireSpinLock(&g_StatsLock, &oldIrql);
+                    g_Stats.DestIp = destIp; // Keep network byte order for inet_ntoa
+                    g_Stats.DestPort = destPort; // Keep network byte order for ntohs
+                    KeReleaseSpinLock(&g_StatsLock, oldIrql);
+                }
             }
         } else if (inFixedValues->layerId == FWPS_LAYER_ALE_FLOW_ESTABLISHED_V6) {
-            FwpsFlowAssociateContext0(inMetaValues->flowHandle, FWPS_LAYER_STREAM_V6, g_CalloutIdStreamV6, g_FlowContextValue);
+            status = FwpsFlowAssociateContext0(inMetaValues->flowHandle, FWPS_LAYER_STREAM_V6, g_CalloutIdStreamV6, g_FlowContextValue);
         }
+
+        KeAcquireSpinLock(&g_StatsLock, &oldIrql);
+        g_Stats.DebugAssocStatus = (ULONG)status;
+        KeReleaseSpinLock(&g_StatsLock, oldIrql);
     }
 }
 
@@ -475,10 +487,15 @@ void StreamClassify(
     UNREFERENCED_PARAMETER(filter);
 
     classifyOut->actionType = FWP_ACTION_PERMIT;
+    
+    KIRQL oldIrql;
+    KeAcquireSpinLock(&g_StatsLock, &oldIrql);
+    g_Stats.DebugStreamCall++;
+    KeReleaseSpinLock(&g_StatsLock, oldIrql);
+
     if ((classifyOut->rights & FWPS_RIGHT_ACTION_WRITE) == 0) return;
 
     if (flowContext == g_FlowContextValue) {
-        KIRQL oldIrql;
         KeAcquireSpinLock(&g_StatsLock, &oldIrql);
         g_Stats.DebugMatchContext++;
         KeReleaseSpinLock(&g_StatsLock, oldIrql);
