@@ -283,8 +283,8 @@ NTSTATUS RegisterCallouts(DEVICE_OBJECT* deviceObject)
     // Add Callouts to WFP Base Filtering Engine
     FWPM_CALLOUT0 mCalloutAle = { 0 };
     mCalloutAle.calloutKey = WFP_MONITOR_CALLOUT_ALE_FLOW_V4;
-    mCalloutAle.displayData.name = L"Wfp Monitor ALE Flow Callout";
-    mCalloutAle.applicableLayer = FWPM_LAYER_ALE_FLOW_ESTABLISHED_V4;
+    mCalloutAle.displayData.name = L"Wfp Monitor ALE Callout";
+    mCalloutAle.applicableLayer = FWPM_LAYER_ALE_AUTH_CONNECT_V4;
     status = FwpmCalloutAdd0(g_EngineHandle, &mCalloutAle, NULL, NULL);
     if (!NT_SUCCESS(status)) return status;
 
@@ -297,8 +297,8 @@ NTSTATUS RegisterCallouts(DEVICE_OBJECT* deviceObject)
 
     FWPM_CALLOUT0 mCalloutAleV6 = { 0 };
     mCalloutAleV6.calloutKey = WFP_MONITOR_CALLOUT_ALE_FLOW_V6;
-    mCalloutAleV6.displayData.name = L"Wfp Monitor ALE Flow Callout V6";
-    mCalloutAleV6.applicableLayer = FWPM_LAYER_ALE_FLOW_ESTABLISHED_V6;
+    mCalloutAleV6.displayData.name = L"Wfp Monitor ALE Callout V6";
+    mCalloutAleV6.applicableLayer = FWPM_LAYER_ALE_AUTH_CONNECT_V6;
     status = FwpmCalloutAdd0(g_EngineHandle, &mCalloutAleV6, NULL, NULL);
     if (!NT_SUCCESS(status)) return status;
 
@@ -312,8 +312,8 @@ NTSTATUS RegisterCallouts(DEVICE_OBJECT* deviceObject)
     // Add Filters
     FWPM_FILTER0 filterAle = { 0 };
     filterAle.filterKey = WFP_MONITOR_CALLOUT_ALE_FLOW_V4;
-    filterAle.displayData.name = L"Wfp Monitor ALE Flow Filter";
-    filterAle.layerKey = FWPM_LAYER_ALE_FLOW_ESTABLISHED_V4;
+    filterAle.displayData.name = L"Wfp Monitor ALE Filter";
+    filterAle.layerKey = FWPM_LAYER_ALE_AUTH_CONNECT_V4;
     filterAle.action.type = FWP_ACTION_CALLOUT_TERMINATING;
     filterAle.action.calloutKey = WFP_MONITOR_CALLOUT_ALE_FLOW_V4;
     filterAle.weight.type = FWP_EMPTY;
@@ -332,8 +332,8 @@ NTSTATUS RegisterCallouts(DEVICE_OBJECT* deviceObject)
 
     FWPM_FILTER0 filterAleV6 = { 0 };
     filterAleV6.filterKey = WFP_MONITOR_CALLOUT_ALE_FLOW_V6;
-    filterAleV6.displayData.name = L"Wfp Monitor ALE Flow Filter V6";
-    filterAleV6.layerKey = FWPM_LAYER_ALE_FLOW_ESTABLISHED_V6;
+    filterAleV6.displayData.name = L"Wfp Monitor ALE Filter V6";
+    filterAleV6.layerKey = FWPM_LAYER_ALE_AUTH_CONNECT_V6;
     filterAleV6.action.type = FWP_ACTION_CALLOUT_TERMINATING;
     filterAleV6.action.calloutKey = WFP_MONITOR_CALLOUT_ALE_FLOW_V6;
     filterAleV6.weight.type = FWP_EMPTY;
@@ -441,19 +441,19 @@ void AleFlowEstablishedClassify(
         KeReleaseSpinLock(&g_StatsLock, oldIrql);
         
         NTSTATUS status = STATUS_SUCCESS;
-        if (inFixedValues->layerId == FWPS_LAYER_ALE_FLOW_ESTABLISHED_V4) {
+        if (inFixedValues->layerId == FWPS_LAYER_ALE_AUTH_CONNECT_V4) {
             status = FwpsFlowAssociateContext0(inMetaValues->flowHandle, FWPS_LAYER_STREAM_V4, g_CalloutIdStreamV4, g_FlowContextValue);
             if (NT_SUCCESS(status)) {
-                if (inFixedValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V4_IP_REMOTE_ADDRESS].value.type == FWP_UINT32) {
-                    UINT32 destIp = inFixedValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V4_IP_REMOTE_ADDRESS].value.uint32;
-                    UINT16 destPort = inFixedValues->incomingValue[FWPS_FIELD_ALE_FLOW_ESTABLISHED_V4_IP_REMOTE_PORT].value.uint16;
+                if (inFixedValues->incomingValue[FWPS_FIELD_ALE_AUTH_CONNECT_V4_IP_REMOTE_ADDRESS].value.type == FWP_UINT32) {
+                    UINT32 destIp = inFixedValues->incomingValue[FWPS_FIELD_ALE_AUTH_CONNECT_V4_IP_REMOTE_ADDRESS].value.uint32;
+                    UINT16 destPort = inFixedValues->incomingValue[FWPS_FIELD_ALE_AUTH_CONNECT_V4_IP_REMOTE_PORT].value.uint16;
                     KeAcquireSpinLock(&g_StatsLock, &oldIrql);
                     g_Stats.DestIp = destIp; // Keep network byte order for inet_ntoa
                     g_Stats.DestPort = destPort; // Keep network byte order for ntohs
                     KeReleaseSpinLock(&g_StatsLock, oldIrql);
                 }
             }
-        } else if (inFixedValues->layerId == FWPS_LAYER_ALE_FLOW_ESTABLISHED_V6) {
+        } else if (inFixedValues->layerId == FWPS_LAYER_ALE_AUTH_CONNECT_V6) {
             status = FwpsFlowAssociateContext0(inMetaValues->flowHandle, FWPS_LAYER_STREAM_V6, g_CalloutIdStreamV6, g_FlowContextValue);
         }
 

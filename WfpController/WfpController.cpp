@@ -148,35 +148,41 @@ int wmain(int argc, wchar_t* argv[]) {
     WFP_MONITOR_SET_PID_IN setPidIn = { pi.dwProcessId };
     DWORD bytesReturned = 0;
     if (!DeviceIoControl(hDevice, IOCTL_WFP_MONITOR_SET_PID, &setPidIn, sizeof(setPidIn), NULL, 0, &bytesReturned, NULL)) {
-        wcerr << L"Failed to send PID to driver: " << GetLastError() << endl;
+        printf("[-] Failed to send PID to driver: %d\n", GetLastError());
     } else {
-        wcout << L"[*] Driver successfully hooked to PID " << pi.dwProcessId << endl;
+        printf("[*] Driver successfully hooked to PID %d\n", pi.dwProcessId);
     }
+    fflush(stdout);
 
     ResumeThread(pi.hThread);
-    wcout << L"[*] Waiting for process to terminate (Timeout: 45s)..." << endl;
+    printf("[*] Waiting for process to terminate (Timeout: 45s)...\n");
+    fflush(stdout);
+
     DWORD waitResult = WaitForSingleObject(pi.hProcess, 45000); // 45 second timeout for CI safety
     if (waitResult == WAIT_TIMEOUT) {
-        wcout << L"[-] Timeout waiting for process. Terminating..." << endl;
+        printf("[-] Timeout waiting for process. Terminating PID %d...\n", pi.dwProcessId);
         TerminateProcess(pi.hProcess, 1);
     } else {
-        wcout << L"[*] Process exited normally." << endl;
+        printf("[*] Process exited normally.\n");
     }
+    fflush(stdout);
 
     // Get Final Stats
     WFP_MONITOR_STATS_OUT statsOut = { 0 };
     if (!DeviceIoControl(hDevice, IOCTL_WFP_MONITOR_GET_STATS, NULL, 0, &statsOut, sizeof(statsOut), &bytesReturned, NULL)) {
-        wcerr << L"Failed to get stats from driver: " << GetLastError() << endl;
+        printf("[-] Failed to get stats from driver: %d\n", GetLastError());
     }
+    fflush(stdout);
 
     CloseHandle(hDevice);
 
     if (!skipMgmt) {
-        wcout << L"[*] Stopping and uninstalling driver..." << endl;
+        printf("[*] Stopping and uninstalling driver...\n");
         ManageDriver(L"WfpMonitor", driverPath, false);
     } else {
-        wcout << L"[*] Skipping driver uninstallation as requested." << endl;
+        printf("[*] Skipping driver uninstallation as requested.\n");
     }
+    fflush(stdout);
 
     // Format results
     string resultStrDst = "ANY";
@@ -187,22 +193,23 @@ int wmain(int argc, wchar_t* argv[]) {
         resultStrDst += ":" + to_string(ntohs(statsOut.DestPort));
     }
 
-    wcout << L"-----------------------------------" << endl;
-    wcout << L"Traffic Statistics for PID " << pi.dwProcessId << L":" << endl;
-    wcout << L"Destination: " << wstring(resultStrDst.begin(), resultStrDst.end()) << endl;
-    wcout << L"Sent: " << statsOut.TxBytes << L" bytes" << endl;
-    wcout << L"Received: " << statsOut.RxBytes << L" bytes" << endl;
-    wcout << L"--- Debug Info ---" << endl;
-    wcout << L"ALE Calls: " << statsOut.DebugCallAle << endl;
-    wcout << L"PID Matches: " << statsOut.DebugMatchPid << endl;
-    wcout << L"Assoc Attempts: " << statsOut.DebugAssocAttempt << endl;
-    wcout << L"Assoc Status: 0x" << hex << statsOut.DebugAssocStatus << dec << endl;
-    wcout << L"Last Seen PID: " << statsOut.DebugLastSeenPid << endl;
-    wcout << L"Stream Calls: " << statsOut.DebugStreamCall << endl;
-    wcout << L"Context Matches: " << statsOut.DebugMatchContext << endl;
-    wcout << L"-----------------------------------" << endl;
+    printf("-----------------------------------\n");
+    printf("Traffic Statistics for PID %d:\n", pi.dwProcessId);
+    printf("Destination: %s\n", resultStrDst.c_str());
+    printf("Sent: %llu bytes\n", statsOut.TxBytes);
+    printf("Received: %llu bytes\n", statsOut.RxBytes);
+    printf("--- Debug Info ---\n");
+    printf("ALE Calls: %u\n", statsOut.DebugCallAle);
+    printf("PID Matches: %u\n", statsOut.DebugMatchPid);
+    printf("Assoc Attempts: %u\n", statsOut.DebugAssocAttempt);
+    printf("Assoc Status: 0x%08X\n", (unsigned int)statsOut.DebugAssocStatus);
+    printf("Last Seen PID: %u\n", statsOut.DebugLastSeenPid);
+    printf("Stream Calls: %u\n", statsOut.DebugStreamCall);
+    printf("Context Matches: %u\n", statsOut.DebugMatchContext);
+    printf("-----------------------------------\n");
+    fflush(stdout);
 
-    // Write to result.txt (in current directory)
+    // Write to result.txt
     ofstream outFile("result.txt");
     if (outFile.is_open()) {
         outFile << "DST=" << resultStrDst << "\n";
@@ -216,10 +223,11 @@ int wmain(int argc, wchar_t* argv[]) {
         outFile << "DEBUG_STREAM_CALLS=" << statsOut.DebugStreamCall << "\n";
         outFile << "DEBUG_CONTEXT_MATCHES=" << statsOut.DebugMatchContext << "\n";
         outFile.close();
-        wcout << L"[*] Results written to result.txt." << endl;
+        printf("[*] Results written to result.txt.\n");
     } else {
-        wcerr << L"[-] Failed to open result.txt for writing." << endl;
+        printf("[-] Failed to open result.txt for writing.\n");
     }
+    fflush(stdout);
 
     CloseHandle(pi.hProcess);
     CloseHandle(pi.hThread);

@@ -92,10 +92,18 @@ jobs:
         $env:WFP_SKIP_DRIVER_MGMT = "1"
         $testExePath = Resolve-Path "test.exe" | Select-Object -ExpandProperty Path
         
-        echo "[*] CP5: Running Controller against test.exe..."
-        # Controller now has its own internal 45s timeout as well
-        Start-Process -FilePath "build\Release\WfpController.exe" -ArgumentList "`"$testExePath`"" -NoNewWindow -Wait
+        echo "[*] CP5: Running Controller against test.exe with PSU timeout..."
+        # Start Controller as a background process to monitor it properly
+        $p = Start-Process -FilePath "build\Release\WfpController.exe" -ArgumentList "`"$testExePath`"" -NoNewWindow -PassThru
         
+        # Wait for controller (it has its own 45s timeout, we wait 60s as backup)
+        try {
+            $p | Wait-Process -Timeout 60 -ErrorAction Stop
+        } catch {
+            echo "[-] Controller hung or timed out at PowerShell level. Killing..."
+            Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
+        }
+
         echo "[*] CP6: Checking for result.txt..."
         if (Test-Path result.txt) { 
            echo "[*] Capture Success! result.txt content:"
