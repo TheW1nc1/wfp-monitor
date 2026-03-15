@@ -191,7 +191,7 @@ int wmain(int argc, wchar_t* argv[]) {
         struct in_addr addr;
         addr.s_addr = statsOut.DestIp;
         resultStrDst = inet_ntoa(addr);
-        resultStrDst += ":" + to_string(ntohs(statsOut.DestPort));
+        resultStrDst += ":" + to_string(statsOut.DestPort);
     }
 
     printf("-----------------------------------\n");

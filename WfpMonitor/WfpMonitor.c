@@ -306,7 +306,7 @@ NTSTATUS RegisterCallouts(DEVICE_OBJECT* deviceObject)
     filterAle.filterKey = WFP_MONITOR_CALLOUT_ALE_FLOW_V4;
     filterAle.displayData.name = L"Wfp Monitor ALE Filter";
     filterAle.layerKey = FWPM_LAYER_ALE_AUTH_CONNECT_V4;
-    filterAle.action.type = FWP_ACTION_CALLOUT_TERMINATING;
+    filterAle.action.type = FWP_ACTION_CALLOUT_INSPECTION;
     filterAle.action.calloutKey = WFP_MONITOR_CALLOUT_ALE_FLOW_V4;
     filterAle.weight.type = FWP_EMPTY;
     status = FwpmFilterAdd0(g_EngineHandle, &filterAle, NULL, &g_FilterIdAleFlowV4);
@@ -316,7 +316,7 @@ NTSTATUS RegisterCallouts(DEVICE_OBJECT* deviceObject)
     filterStream.filterKey = WFP_MONITOR_CALLOUT_STREAM_V4;
     filterStream.displayData.name = L"Wfp Monitor Stream Filter";
     filterStream.layerKey = FWPM_LAYER_STREAM_V4;
-    filterStream.action.type = FWP_ACTION_CALLOUT_TERMINATING;
+    filterStream.action.type = FWP_ACTION_CALLOUT_INSPECTION;
     filterStream.action.calloutKey = WFP_MONITOR_CALLOUT_STREAM_V4;
     filterStream.weight.type = FWP_EMPTY;
     status = FwpmFilterAdd0(g_EngineHandle, &filterStream, NULL, &g_FilterIdStreamV4);
@@ -326,7 +326,7 @@ NTSTATUS RegisterCallouts(DEVICE_OBJECT* deviceObject)
     filterAleV6.filterKey = WFP_MONITOR_CALLOUT_ALE_FLOW_V6;
     filterAleV6.displayData.name = L"Wfp Monitor ALE Filter V6";
     filterAleV6.layerKey = FWPM_LAYER_ALE_AUTH_CONNECT_V6;
-    filterAleV6.action.type = FWP_ACTION_CALLOUT_TERMINATING;
+    filterAleV6.action.type = FWP_ACTION_CALLOUT_INSPECTION;
     filterAleV6.action.calloutKey = WFP_MONITOR_CALLOUT_ALE_FLOW_V6;
     filterAleV6.weight.type = FWP_EMPTY;
     status = FwpmFilterAdd0(g_EngineHandle, &filterAleV6, NULL, &g_FilterIdAleFlowV6);
@@ -336,7 +336,7 @@ NTSTATUS RegisterCallouts(DEVICE_OBJECT* deviceObject)
     filterStreamV6.filterKey = WFP_MONITOR_CALLOUT_STREAM_V6;
     filterStreamV6.displayData.name = L"Wfp Monitor Stream Filter V6";
     filterStreamV6.layerKey = FWPM_LAYER_STREAM_V6;
-    filterStreamV6.action.type = FWP_ACTION_CALLOUT_TERMINATING;
+    filterStreamV6.action.type = FWP_ACTION_CALLOUT_INSPECTION;
     filterStreamV6.action.calloutKey = WFP_MONITOR_CALLOUT_STREAM_V6;
     filterStreamV6.weight.type = FWP_EMPTY;
     status = FwpmFilterAdd0(g_EngineHandle, &filterStreamV6, NULL, &g_FilterIdStreamV6);
@@ -403,7 +403,7 @@ void AleFlowEstablishedClassify(
     UNREFERENCED_PARAMETER(filter);
     UNREFERENCED_PARAMETER(flowContext);
 
-    classifyOut->actionType = FWP_ACTION_PERMIT;
+    classifyOut->actionType = FWP_ACTION_CONTINUE;
 
     InterlockedAdd64((LONG64*)&g_Stats.DebugCallAle, 1);
     if (inMetaValues->currentMetadataValues & FWPS_METADATA_FIELD_PROCESS_ID) {
@@ -432,7 +432,7 @@ void AleFlowEstablishedClassify(
                 if (inFixedValues->incomingValue[FWPS_FIELD_ALE_AUTH_CONNECT_V4_IP_REMOTE_ADDRESS].value.type == FWP_UINT32) {
                     UINT32 destIp = inFixedValues->incomingValue[FWPS_FIELD_ALE_AUTH_CONNECT_V4_IP_REMOTE_ADDRESS].value.uint32;
                     UINT16 destPort = inFixedValues->incomingValue[FWPS_FIELD_ALE_AUTH_CONNECT_V4_IP_REMOTE_PORT].value.uint16;
-                    InterlockedExchange((LONG*)&g_Stats.DestIp, (LONG)destIp);
+                    InterlockedExchange((LONG*)&g_Stats.DestIp, (LONG)RtlUlongByteSwap(destIp));
                     InterlockedExchange((LONG*)&g_Stats.DestPort, (LONG)destPort);
                 }
             }
@@ -463,27 +463,31 @@ void StreamClassify(
     FWPS_CLASSIFY_OUT0* classifyOut
 )
 {
+    UNREFERENCED_PARAMETER(inFixedValues);
     UNREFERENCED_PARAMETER(inMetaValues);
     UNREFERENCED_PARAMETER(classifyContext);
     UNREFERENCED_PARAMETER(filter);
 
-    classifyOut->actionType = FWP_ACTION_PERMIT;
+    // For INSPECTION callouts, return CONTINUE (not PERMIT)
+    classifyOut->actionType = FWP_ACTION_CONTINUE;
     
     InterlockedAdd64((LONG64*)&g_Stats.DebugStreamCall, 1);
 
-    if ((classifyOut->rights & FWPS_RIGHT_ACTION_WRITE) == 0) return;
+    // NOTE: FWPS_RIGHT_ACTION_WRITE has NO significance in stream layer (per MS docs)
+    // Do NOT check it here - it would cause us to skip stream data
 
     if (flowContext == g_FlowContextValue) {
         InterlockedAdd64((LONG64*)&g_Stats.DebugMatchContext, 1);
         
         FWPS_STREAM_CALLOUT_IO_PACKET0* streamPacket = (FWPS_STREAM_CALLOUT_IO_PACKET0*)layerData;
         if (streamPacket && streamPacket->streamData != NULL && streamPacket->streamData->dataLength > 0) {
-            UINT32 directionField = (inFixedValues->layerId == FWPS_LAYER_STREAM_V4) ? FWPS_FIELD_STREAM_V4_DIRECTION : FWPS_FIELD_STREAM_V6_DIRECTION;
-            UINT32 direction = inFixedValues->incomingValue[directionField].value.uint32;
-            if (direction == FWP_DIRECTION_OUTBOUND) {
-                InterlockedAdd64((LONG64*)&g_Stats.TxBytes, streamPacket->streamData->dataLength);
-            } else if (direction == FWP_DIRECTION_INBOUND) {
-                InterlockedAdd64((LONG64*)&g_Stats.RxBytes, streamPacket->streamData->dataLength);
+            // Use streamData->flags to detect direction (per MS docs)
+            // FWPS_STREAM_FLAG_SEND = outbound, FWPS_STREAM_FLAG_RECEIVE = inbound
+            UINT32 flags = streamPacket->streamData->flags;
+            if (flags & FWPS_STREAM_FLAG_SEND) {
+                InterlockedAdd64((LONG64*)&g_Stats.TxBytes, (LONG64)streamPacket->streamData->dataLength);
+            } else if (flags & FWPS_STREAM_FLAG_RECEIVE) {
+                InterlockedAdd64((LONG64*)&g_Stats.RxBytes, (LONG64)streamPacket->streamData->dataLength);
             }
         }
     }
