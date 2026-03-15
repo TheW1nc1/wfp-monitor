@@ -8,6 +8,7 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <cstdio>
 #include <winsvc.h>
 #include <iphlpapi.h>
 #include <tlhelp32.h>

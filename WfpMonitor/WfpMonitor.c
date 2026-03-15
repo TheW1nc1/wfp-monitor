@@ -199,12 +199,8 @@ NTSTATUS WfpMonitorDeviceControl(PDEVICE_OBJECT DeviceObject, PIRP Irp)
         if (irpSp->Parameters.DeviceIoControl.OutputBufferLength >= sizeof(WFP_MONITOR_STATS_OUT))
         {
             PWFP_MONITOR_STATS_OUT outBuf = (PWFP_MONITOR_STATS_OUT)Irp->AssociatedIrp.SystemBuffer;
-            
-            KIRQL oldIrql;
-            KeAcquireSpinLock(&g_StatsLock, &oldIrql);
+            // Return a snapshot using InterlockedRead or simple copy (single reader/multi writer for simple types is OK for stats)
             *outBuf = g_Stats;
-            KeReleaseSpinLock(&g_StatsLock, oldIrql);
-            
             info = sizeof(WFP_MONITOR_STATS_OUT);
         }
         else
@@ -413,13 +409,10 @@ void AleFlowEstablishedClassify(
 
     classifyOut->actionType = FWP_ACTION_PERMIT;
 
-    KIRQL oldIrql;
-    KeAcquireSpinLock(&g_StatsLock, &oldIrql);
-    g_Stats.DebugCallAle++;
+    InterlockedAdd64((LONG64*)&g_Stats.DebugCallAle, 1);
     if (inMetaValues->currentMetadataValues & FWPS_METADATA_FIELD_PROCESS_ID) {
-        g_Stats.DebugLastSeenPid = (ULONG)inMetaValues->processId;
+        InterlockedExchange((LONG*)&g_Stats.DebugLastSeenPid, (LONG)(ULONG_PTR)inMetaValues->processId);
     }
-    KeReleaseSpinLock(&g_StatsLock, oldIrql);
 
     // CRITICAL: We do association even if rights check fails (read-only mode)
     // but we check for metadata availability first.
@@ -435,10 +428,8 @@ void AleFlowEstablishedClassify(
     KeReleaseSpinLock(&g_StatsLock, oldIrql);
 
     if (targetPid > 0 && processId == targetPid) {
-        KeAcquireSpinLock(&g_StatsLock, &oldIrql);
-        g_Stats.DebugMatchPid++;
-        g_Stats.DebugAssocAttempt++;
-        KeReleaseSpinLock(&g_StatsLock, oldIrql);
+        InterlockedAdd64((LONG64*)&g_Stats.DebugMatchPid, 1);
+        InterlockedAdd64((LONG64*)&g_Stats.DebugAssocAttempt, 1);
         
         NTSTATUS status = STATUS_SUCCESS;
         if (inFixedValues->layerId == FWPS_LAYER_ALE_AUTH_CONNECT_V4) {
@@ -447,19 +438,15 @@ void AleFlowEstablishedClassify(
                 if (inFixedValues->incomingValue[FWPS_FIELD_ALE_AUTH_CONNECT_V4_IP_REMOTE_ADDRESS].value.type == FWP_UINT32) {
                     UINT32 destIp = inFixedValues->incomingValue[FWPS_FIELD_ALE_AUTH_CONNECT_V4_IP_REMOTE_ADDRESS].value.uint32;
                     UINT16 destPort = inFixedValues->incomingValue[FWPS_FIELD_ALE_AUTH_CONNECT_V4_IP_REMOTE_PORT].value.uint16;
-                    KeAcquireSpinLock(&g_StatsLock, &oldIrql);
-                    g_Stats.DestIp = destIp; // Keep network byte order for inet_ntoa
-                    g_Stats.DestPort = destPort; // Keep network byte order for ntohs
-                    KeReleaseSpinLock(&g_StatsLock, oldIrql);
+                    InterlockedExchange((LONG*)&g_Stats.DestIp, (LONG)destIp);
+                    InterlockedExchange((LONG*)&g_Stats.DestPort, (LONG)destPort);
                 }
             }
         } else if (inFixedValues->layerId == FWPS_LAYER_ALE_AUTH_CONNECT_V6) {
             status = FwpsFlowAssociateContext0(inMetaValues->flowHandle, FWPS_LAYER_STREAM_V6, g_CalloutIdStreamV6, g_FlowContextValue);
         }
 
-        KeAcquireSpinLock(&g_StatsLock, &oldIrql);
-        g_Stats.DebugAssocStatus = (ULONG)status;
-        KeReleaseSpinLock(&g_StatsLock, oldIrql);
+        InterlockedExchange((LONG*)&g_Stats.DebugAssocStatus, (LONG)status);
     }
 }
 
@@ -488,17 +475,12 @@ void StreamClassify(
 
     classifyOut->actionType = FWP_ACTION_PERMIT;
     
-    KIRQL oldIrql;
-    KeAcquireSpinLock(&g_StatsLock, &oldIrql);
-    g_Stats.DebugStreamCall++;
-    KeReleaseSpinLock(&g_StatsLock, oldIrql);
+    InterlockedAdd64((LONG64*)&g_Stats.DebugStreamCall, 1);
 
     if ((classifyOut->rights & FWPS_RIGHT_ACTION_WRITE) == 0) return;
 
     if (flowContext == g_FlowContextValue) {
-        KeAcquireSpinLock(&g_StatsLock, &oldIrql);
-        g_Stats.DebugMatchContext++;
-        KeReleaseSpinLock(&g_StatsLock, oldIrql);
+        InterlockedAdd64((LONG64*)&g_Stats.DebugMatchContext, 1);
         
         FWPS_STREAM_CALLOUT_IO_PACKET0* streamPacket = (FWPS_STREAM_CALLOUT_IO_PACKET0*)layerData;
         if (streamPacket && streamPacket->streamData != NULL && streamPacket->streamData->dataLength > 0) {
@@ -506,11 +488,10 @@ void StreamClassify(
             UINT32 direction = inFixedValues->incomingValue[directionField].value.uint32;
             KeAcquireSpinLock(&g_StatsLock, &oldIrql);
             if (direction == FWP_DIRECTION_OUTBOUND) {
-                g_Stats.TxBytes += streamPacket->streamData->dataLength;
+                InterlockedAdd64((LONG64*)&g_Stats.TxBytes, streamPacket->streamData->dataLength);
             } else if (direction == FWP_DIRECTION_INBOUND) {
-                g_Stats.RxBytes += streamPacket->streamData->dataLength;
+                InterlockedAdd64((LONG64*)&g_Stats.RxBytes, streamPacket->streamData->dataLength);
             }
-            KeReleaseSpinLock(&g_StatsLock, oldIrql);
         }
     }
 }
