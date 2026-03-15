@@ -27,7 +27,7 @@ UINT64 g_FilterIdStreamV6 = 0;
 
 ULONG g_TargetPid = 0;
 WFP_MONITOR_STATS_OUT g_Stats = { 0 };
-KSPIN_LOCK g_StatsLock;
+
 
 // Custom Context Tag
 #define WFP_CONTEXT_TAG 'PFWM'
@@ -112,8 +112,6 @@ NTSTATUS DriverEntry(PDRIVER_OBJECT DriverObject, PUNICODE_STRING RegistryPath)
     DriverObject->MajorFunction[IRP_MJ_CREATE] = WfpMonitorCreateClose;
     DriverObject->MajorFunction[IRP_MJ_CLOSE] = WfpMonitorCreateClose;
     DriverObject->MajorFunction[IRP_MJ_DEVICE_CONTROL] = WfpMonitorDeviceControl;
-
-    KeInitializeSpinLock(&g_StatsLock);
 
     // Open WFP Engine
     FWPM_SESSION0 session = { 0 };
@@ -422,10 +420,8 @@ void AleFlowEstablishedClassify(
     }
 
     ULONG processId = (ULONG)inMetaValues->processId;
-    ULONG targetPid;
-    KeAcquireSpinLock(&g_StatsLock, &oldIrql);
-    targetPid = g_TargetPid;
-    KeReleaseSpinLock(&g_StatsLock, oldIrql);
+    ULONG targetPid = g_TargetPid;
+
 
     if (targetPid > 0 && processId == targetPid) {
         InterlockedAdd64((LONG64*)&g_Stats.DebugMatchPid, 1);
@@ -486,7 +482,6 @@ void StreamClassify(
         if (streamPacket && streamPacket->streamData != NULL && streamPacket->streamData->dataLength > 0) {
             UINT32 directionField = (inFixedValues->layerId == FWPS_LAYER_STREAM_V4) ? FWPS_FIELD_STREAM_V4_DIRECTION : FWPS_FIELD_STREAM_V6_DIRECTION;
             UINT32 direction = inFixedValues->incomingValue[directionField].value.uint32;
-            KeAcquireSpinLock(&g_StatsLock, &oldIrql);
             if (direction == FWP_DIRECTION_OUTBOUND) {
                 InterlockedAdd64((LONG64*)&g_Stats.TxBytes, streamPacket->streamData->dataLength);
             } else if (direction == FWP_DIRECTION_INBOUND) {
