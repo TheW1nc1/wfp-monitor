@@ -1,65 +1,44 @@
 # WFP 流量监控组件
 
-本项目实现了一个基于 Windows Filtering Platform（WFP）的流量监控组件，包含：
-- **内核态 WFP Callout 驱动** (`WfpMonitor.sys`)：在 `FWPM_LAYER_ALE_AUTH_CONNECT` 层捕获 TCP 连接，通过 `FwpsFlowAssociateContext0` 将流上下文关联到 `FWPM_LAYER_STREAM` 层，使用 `FWPS_STREAM_FLAG_SEND/RECEIVE` 分别统计出口/入口字节数。
-- **用户态控制程序** (`WfpController.exe`)：自动安装驱动、以挂起模式启动 `test.exe` 获取 PID、通过 IOCTL 传递 PID 给驱动、等待进程结束后获取统计结果、输出 `result.txt`。
+本项目是为统计 `test.exe` 生命周期内的 TCP 流量而设计的 WFP (Windows Filtering Platform) 组件，由驱动程序 (`WfpMonitor.sys`) 和控制程序 (`WfpController.exe`) 组成。
 
-## 1. 依赖信息与环境要求
+## 1. 技术方案实现
 
-| 依赖 | 版本 |
-|------|------|
-| 操作系统 | Windows 10 / 11 (x64) |
-| WDK | 10.0.22621.0 |
-| 编译器 | Visual Studio 2022 (MSVC) |
-| 构建系统 | CMake 3.20+ |
+### 内核态驱动 (WfpMonitor)
+驱动程序工作在两个 WFP 层级：
+- **ALE 连接层** (`FWPM_LAYER_ALE_AUTH_CONNECT_V4`)：
+  - 拦截目标 PIsD 的连接请求。
+  - 使用 `FwpsFlowAssociateContext0` 为该连接关联上下文。
+  - 获取目的 IP 和端口。
+- **Stream 流数据层** (`FWPM_LAYER_STREAM_V4`)：
+  - 通过 ALE 层关联的上下文识别目标流量。
+  - 使用 `streamData->flags` 判断方向（`FWPS_STREAM_FLAG_SEND` / `FWPS_STREAM_FLAG_RECEIVE`）。
+  - 对 `streamData->dataLength` 进行原子累加。
 
-## 2. 构建步骤
+### 用户态控制程序 (WfpController)
+- **生命周期管理**：以挂起状态启动 `test.exe` 以确保捕获完整生命周期流量。
+- **自动逻辑**：自动创建/启动驱动服务，通过 IOCTL 通信获取结果，最后自动停止服务。
 
-### 2.1 本地构建
-1. 确保安装 Visual Studio 2022 和 WDK 10.0.22621.0
-2. 打开 **Developer Command Prompt for VS 2022**
-3. 在项目根目录运行：
-   ```cmd
-   cmake -B build -G "Visual Studio 17 2022" -A x64 -DCMAKE_SYSTEM_VERSION=10.0.22621.0
-   cmake --build build --config Release
-   ```
-4. 产物位于 `build/Release/`：
-   - `WfpMonitor.sys`（内核驱动）
-   - `WfpController.exe`（用户态控制程序）
+## 2. 依赖与环境
 
-### 2.2 CI 自动构建
-本项目配置了 GitHub Actions CI，推送到 `master` 分支后自动构建。编译产物可从 Actions → Artifacts 下载。
+- **运行环境**：Windows 10/11 x64 (需要开启 `bcdedit /set testsigning on`)
+- **编译环境**：Visual Studio 2022, WDK 10.0.22621.0, CMake 3.20+
 
-## 3. 运行步骤
+## 3. 构建与执行步骤
 
-### 3.1 准备测试环境
-⚠️ 由于驱动未经 WHQL 签名，需在测试虚拟机中开启测试签名模式：
+### 编译
 ```cmd
-bcdedit /set testsigning on
+cmake -B build -G "Visual Studio 17 2022" -A x64 -DCMAKE_SYSTEM_VERSION=10.0.22621.0
+cmake --build build --config Release
 ```
-**必须重启**。重启后右下角出现"测试模式"水印即可。
 
-### 3.2 执行测试
-1. 将 `WfpMonitor.sys`、`WfpController.exe`、`test.exe` 放在同一目录
-2. **以管理员身份**打开 CMD
-3. 运行：
-   ```cmd
-   .\WfpController.exe .\test.exe
-   ```
+### 运行
+1. 以管理员权限运行 CMD。
+2. 执行 `.\WfpController.exe .\test.exe`。
+3. 执行完成后，同目录下生成的 `result.txt` 即为统计结果。
 
-### 3.3 工作流程
-1. `WfpController.exe` 通过 SCM 安装并启动 `WfpMonitor` 驱动服务
-2. 以 `CREATE_SUSPENDED` 模式启动 `test.exe`，获取其 PID
-3. 通过 `IOCTL_WFP_MONITOR_SET_PID` 将 PID 发送给驱动
-4. 驱动在 ALE 层匹配该 PID 的 TCP 连接，关联流上下文到 Stream 层
-5. 唤醒 `test.exe`，驱动在 Stream 层按 `FWPS_STREAM_FLAG_SEND/RECEIVE` 统计字节
-6. `test.exe` 结束后，通过 `IOCTL_WFP_MONITOR_GET_STATS` 获取统计结果
-7. 写入 `result.txt` 并自动卸载驱动
+## 4. 特别说明
 
-### 3.4 result.txt 生成位置
-执行完毕后，在**当前目录**生成 `result.txt`，格式：
-```
-DST=<ip:port>
-TX_BYTES=<number>
-RX_BYTES=<number>
-```
+- **关于测试加载**：由于内核驱动未通过微软 WHQL 认证，测试前必须在虚拟机中运行 `bcdedit /set testsigning on` 并重启，否则驱动无法通过 `sc start` 启动。
+- **关于 GitHub CI**：CI 仅用于验证代码在标准 WDK 环境下的可编译性。GitHub 托管的 Runner 无法开启测试模式进行驱动加载测试。
+- **代码库内容**：本项目已包含完整的驱动源码、控制器源码、以及在测试环境下生成的 `result.txt`。
