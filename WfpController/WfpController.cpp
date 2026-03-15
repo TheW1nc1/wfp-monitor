@@ -216,13 +216,6 @@ int wmain(int argc, wchar_t* argv[]) {
         outFile << "DST=" << resultStrDst << "\n";
         outFile << "TX_BYTES=" << statsOut.TxBytes << "\n";
         outFile << "RX_BYTES=" << statsOut.RxBytes << "\n";
-        outFile << "DEBUG_ALE_CALLS=" << statsOut.DebugCallAle << "\n";
-        outFile << "DEBUG_PID_MATCHES=" << statsOut.DebugMatchPid << "\n";
-        outFile << "DEBUG_ASSOC_ATTEMPTS=" << statsOut.DebugAssocAttempt << "\n";
-        outFile << "DEBUG_ASSOC_STATUS=0x" << hex << statsOut.DebugAssocStatus << dec << "\n";
-        outFile << "DEBUG_LAST_SEEN_PID=" << statsOut.DebugLastSeenPid << "\n";
-        outFile << "DEBUG_STREAM_CALLS=" << statsOut.DebugStreamCall << "\n";
-        outFile << "DEBUG_CONTEXT_MATCHES=" << statsOut.DebugMatchContext << "\n";
         outFile.close();
         printf("[*] Results written to result.txt.\n");
     } else {
