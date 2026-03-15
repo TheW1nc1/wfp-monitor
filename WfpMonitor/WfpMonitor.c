@@ -178,11 +178,9 @@ NTSTATUS WfpMonitorDeviceControl(PDEVICE_OBJECT DeviceObject, PIRP Irp)
         {
             PWFP_MONITOR_SET_PID_IN inBuf = (PWFP_MONITOR_SET_PID_IN)Irp->AssociatedIrp.SystemBuffer;
             
-            KIRQL oldIrql;
-            KeAcquireSpinLock(&g_StatsLock, &oldIrql);
-            g_TargetPid = inBuf->ProcessId;
+            // Atomically set PID and reset stats
+            InterlockedExchange((LONG*)&g_TargetPid, (LONG)inBuf->ProcessId);
             RtlZeroMemory(&g_Stats, sizeof(g_Stats));
-            KeReleaseSpinLock(&g_StatsLock, oldIrql);
             
             info = sizeof(WFP_MONITOR_SET_PID_IN);
         }
