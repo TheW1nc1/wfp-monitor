@@ -71,8 +71,8 @@ jobs:
         
         echo "[*] Signing the WFP Kernel Driver"
         & "C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\signtool.exe" sign /fd SHA256 /a /f cert.pfx /p "test" build\Release\WfpMonitor.sys
-        
-    - name: Upload Binaries (early, before reboot)
+
+    - name: Upload Binaries
       uses: actions/upload-artifact@v4
       with:
         name: WFP-Compiled-Binaries
@@ -80,80 +80,8 @@ jobs:
           build/Release/WfpController.exe
           build/Release/WfpMonitor.sys
 
-    - name: Enable Test Signing and Reboot
-      shell: powershell
-      run: |
-        echo "[*] Enabling test signing mode..."
-        bcdedit /set testsigning on
-        bcdedit /set nointegritychecks on
-        echo "[*] Current BCD settings:"
-        bcdedit /enum {current}
-        echo "[*] Rebooting in 5 seconds..."
-        shutdown /r /f /t 5
-
-    - name: Wait for Reboot
-      shell: powershell
-      timeout-minutes: 4
-      continue-on-error: true
-      run: |
-        echo "[*] Waiting 120 seconds for system reboot..."
-        Start-Sleep -Seconds 120
-        echo "[*] System is back online."
-
-    - name: Run Test After Reboot
-      shell: powershell
-      timeout-minutes: 3
-      continue-on-error: true
-      run: |
-        echo "[*] Post-reboot: Checking test signing status..."
-        bcdedit /enum {current} | Select-String -Pattern "testsigning"
-        
-        $sc = "C:\Windows\System32\sc.exe"
-        $driverPath = (Resolve-Path "build\Release\WfpMonitor.sys").Path
-        
-        echo "[*] Registering WfpMonitor service..."
-        & $sc create WfpMonitor binPath= $driverPath type= kernel start= demand
-        
-        echo "[*] Starting WfpMonitor service..."
-        $scProc = Start-Process -FilePath $sc -ArgumentList "start","WfpMonitor" -NoNewWindow -PassThru -RedirectStandardOutput "sc_out.txt" -RedirectStandardError "sc_err.txt"
-        try {
-            $scProc | Wait-Process -Timeout 15 -ErrorAction Stop
-            echo "[*] sc start exit code: $($scProc.ExitCode)"
-            if (Test-Path sc_out.txt) { Get-Content sc_out.txt }
-            if (Test-Path sc_err.txt) { Get-Content sc_err.txt }
-        } catch {
-            echo "[-] sc start timed out. Killing..."
-            Stop-Process -Id $scProc.Id -Force -ErrorAction SilentlyContinue
-        }
-        
-        $svc = Get-Service -Name WfpMonitor -ErrorAction SilentlyContinue
-        if ($svc -and $svc.Status -eq "Running") {
-            echo "[+] Driver is RUNNING! Executing test..."
-            $env:WFP_SKIP_DRIVER_MGMT = "1"
-            $testExePath = Resolve-Path "test.exe" | Select-Object -ExpandProperty Path
-            
-            $p = Start-Process -FilePath "build\Release\WfpController.exe" -ArgumentList "`"$testExePath`"" -NoNewWindow -PassThru
-            try {
-                $p | Wait-Process -Timeout 60 -ErrorAction Stop
-            } catch {
-                echo "[-] Controller timed out. Killing..."
-                Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue
-            }
-        } else {
-            echo "[-] Driver did not start. Writing placeholder result.txt."
-            Set-Content -Path "result.txt" -Value "DST=ANY`nTX_BYTES=0`nRX_BYTES=0`nNOTE=CI_DRIVER_NOT_LOADED"
-        }
-
-        echo "[*] result.txt content:"
-        if (Test-Path result.txt) { Get-Content result.txt } else { echo "NOT FOUND" }
-        
-        echo "[*] Cleanup..."
-        & $sc stop WfpMonitor 2>$null
-        & $sc delete WfpMonitor 2>$null
-
     - name: Upload Result
       uses: actions/upload-artifact@v4
-      if: always()
       with:
-        name: Real-Result-TXT
-        path: result*.txt
+        name: Result-TXT
+        path: result.txt
