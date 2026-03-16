@@ -6,9 +6,10 @@
 
 ### 内核态驱动 (WfpMonitor)
 驱动程序工作在两个 WFP 层级：
-- **ALE 连接层** (`FWPM_LAYER_ALE_AUTH_CONNECT_V4`)：
-  - 拦截目标 PIsD 的连接请求。
-  - 使用 `FwpsFlowAssociateContext0` 为该连接关联上下文。
+- **ALE 流建立层** (`FWPM_LAYER_ALE_FLOW_ESTABLISHED_V4`)：
+  - 在 TCP 连接建立后（三次握手完成）触发。
+  - 通过 PID 识别目标进程。
+  - 使用 `FwpsFlowAssociateContext0` 为该连接关联上下文到 Stream 层。
   - 获取目的 IP 和端口。
 - **Stream 流数据层** (`FWPM_LAYER_STREAM_V4`)：
   - 通过 ALE 层关联的上下文识别目标流量。
